@@ -1,0 +1,155 @@
+/* ==========================================================================
+   BELLA STUDIO & CO. — LUXURY BEAUTY SALON DESIGN SYSTEM
+   Clean, intuitive, high-end aesthetic tailored for feminine beauty services.
+   ========================================================================== */
+
+:root {
+  /* Harmonious Rose Gold & Luxury Beauty Palette */
+  --rose-50: #fbf6f5;
+  --rose-100: #f7ebe8;
+  --rose-200: #eed5ce;
+  --rose-300: #e0b4a8;
+  --rose-400: #ce8f80;
+  --rose-500: #b86e5e; /* Primary Brand Accent */
+  --rose-600: #9e5546;
+  --rose-700: #7d4134;
+
+  --champagne-light: #fefcf9;
+  --champagne-surface: #f9f4ef;
+  --champagne-border: #ede4db;
+
+  --gold-accent: #d4af37;
+  --gold-soft: #f4ecd6;
+
+  /* Neutrals (Light Mode) */
+  --bg-app: #fcf9f7;
+  --bg-card: #ffffff;
+  --bg-card-hover: #faf6f4;
+  --bg-modal: rgba(255, 255, 255, 0.98);
+  --border-subtle: #eedfd9;
+  --border-focus: #b86e5e;
+
+  --text-primary: #291e1d;
+  --text-secondary: #6e5e5b;
+  --text-muted: #9c8a87;
+  --text-inverse: #ffffff;
+
+  /* Status Colors */
+  --status-agendado-bg: #f4ebd0;
+  --status-agendado-text: #825f16;
+  --status-atendendo-bg: #fce7e3;
+  --status-atendendo-text: #b84d38;
+  --status-concluido-bg: #e2f4ea;
+  --status-concluido-text: #1b7440;
+  --status-cancelado-bg: #fbe3e4;
+  --status-cancelado-text: #962c32;
+
+  /* Category Accents */
+  --cat-cabelo: #b86e5e;
+  --cat-cabelo-bg: #fbf0ee;
+  --cat-sobrancelhas: #7e57c2;
+  --cat-sobrancelhas-bg: #f4effc;
+  --cat-depilacao: #d97706;
+  --cat-depilacao-bg: #fef7ed;
+
+  /* Elevation & Shadows */
+  --shadow-sm: 0 2px 8px rgba(184, 110, 94, 0.05);
+  --shadow-md: 0 8px 24px rgba(184, 110, 94, 0.08);
+  --shadow-lg: 0 16px 40px rgba(184, 110, 94, 0.12);
+  --shadow-float: 0 20px 50px rgba(41, 30, 29, 0.18);
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+}
+
+[data-theme='dark'] {
+  --bg-app: #151112;
+  --bg-card: #201a1c;
+  --bg-card-hover: #292224;
+  --bg-modal: rgba(32, 26, 28, 0.98);
+  --border-subtle: #3a2e31;
+  --border-focus: #ce8f80;
+
+  --text-primary: #faeeec;
+  --text-secondary: #c9b7b4;
+  --text-muted: #8c7875;
+  --text-inverse: #151112;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+
+  --cat-cabelo-bg: #352123;
+  --cat-sobrancelhas-bg: #291e36;
+  --cat-depilacao-bg: #362415;
+}
+
+/* Base Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  outline: none;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.fade-in {
+  animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rose-200);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--rose-300);
+}
