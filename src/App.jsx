@@ -71,8 +71,13 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Check version reset to guarantee fresh zeroed start for Belíssima
+  // Garantir que o catálogo de serviços esteja sempre preservado em produção
   useEffect(() => {
+    const savedServices = localStorage.getItem('belissima_services');
+    if (!savedServices || savedServices === '[]') {
+      localStorage.setItem('belissima_services', JSON.stringify(INITIAL_SERVICES));
+      setServices(INITIAL_SERVICES);
+    }
     const initialized = localStorage.getItem('belissima_v1_ready');
     if (!initialized) {
       localStorage.setItem('belissima_users', JSON.stringify(INITIAL_USERS));
@@ -87,7 +92,13 @@ export default function App() {
   // Main Entities State with LocalStorage
   const [users, setUsers] = useState(() => {
     const saved = localStorage.getItem('belissima_users');
-    return saved ? JSON.parse(saved) : INITIAL_USERS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_USERS;
   });
 
   const [currentUser, setCurrentUser] = useState(() => {
@@ -98,7 +109,15 @@ export default function App() {
 
   const [services, setServices] = useState(() => {
     const saved = localStorage.getItem('belissima_services');
-    return saved ? JSON.parse(saved) : INITIAL_SERVICES;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return INITIAL_SERVICES;
   });
 
   const [appointments, setAppointments] = useState(() => {

@@ -13,10 +13,7 @@ export const INITIAL_USERS = [
   }
 ];
 
-// Serviços zerados (pronto para cadastrar do zero)
-export const INITIAL_SERVICES = [];
-
-// Catálogo modelo sugerido (caso queira importar ou carregar serviços prontos com 1 clique)
+// Catálogo de Serviços Especializados (Cabelo Feminino, Sobrancelhas e Depilação)
 export const SUGGESTED_SERVICES_TEMPLATE = [
   // Cabelo Feminino
   { id: 'cab-1', category: 'cabelo', name: 'Corte Feminino & Finalização', price: 120, duration: 50, description: 'Corte personalizado, lavagem especial e modelagem com escova' },
@@ -42,6 +39,9 @@ export const SUGGESTED_SERVICES_TEMPLATE = [
   { id: 'dep-5', category: 'depilacao', name: 'Depilação Íntima Completa (Virilha Total)', price: 70, duration: 40, description: 'Virilha completa + perianal com cera própria para peles sensíveis' },
   { id: 'dep-6', category: 'depilacao', name: 'Depilação de Braços', price: 40, duration: 30, description: 'Cera morna com hidratação calmante' },
 ];
+
+// Serviços iniciais mantidos em produção com catálogo feminino completo
+export const INITIAL_SERVICES = SUGGESTED_SERVICES_TEMPLATE;
 
 export const INITIAL_PRODUCTS = [];
 
