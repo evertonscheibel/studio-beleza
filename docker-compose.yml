@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  belissima-web:
+    build: .
+    image: belissima-web:latest
+    container_name: belissima-web
+    restart: unless-stopped
+    ports:
+      # Padrão Bridge: vinculação estrita em 127.0.0.1 na porta 5240
+      - "127.0.0.1:5240:80"
+    environment:
+      - NODE_ENV=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
