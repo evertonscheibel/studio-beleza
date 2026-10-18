@@ -951,6 +951,54 @@ export default function App() {
         )}
       </main>
 
+      {/* Mobile Bottom Navigation Bar (Mobile First) */}
+      <nav className="mobile-bottom-nav">
+        <div className="mobile-nav-items">
+          <button
+            className={`mobile-nav-btn ${activeTab === 'agenda' ? 'active' : ''}`}
+            onClick={() => setActiveTab('agenda')}
+          >
+            <Calendar size={20} />
+            <span>Agenda</span>
+            {filteredAppointments.length > 0 && (
+              <span className="mobile-nav-badge">{filteredAppointments.length}</span>
+            )}
+          </button>
+
+          <button
+            className={`mobile-nav-btn ${activeTab === 'caixa' ? 'active' : ''}`}
+            onClick={() => setActiveTab('caixa')}
+          >
+            <Receipt size={20} />
+            <span>Caixa</span>
+          </button>
+
+          <button
+            className={`mobile-nav-btn ${activeTab === 'servicos' ? 'active' : ''}`}
+            onClick={() => setActiveTab('servicos')}
+          >
+            <Scissors size={20} />
+            <span>Serviços</span>
+          </button>
+
+          <button
+            className={`mobile-nav-btn ${activeTab === 'clientes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('clientes')}
+          >
+            <Users size={20} />
+            <span>Clientes</span>
+          </button>
+
+          <button
+            className={`mobile-nav-btn ${activeTab === 'financeiro' ? 'active' : ''}`}
+            onClick={() => setActiveTab('financeiro')}
+          >
+            <TrendingUp size={20} />
+            <span>Finanças</span>
+          </button>
+        </div>
+      </nav>
+
       {/* =========================================================================
           MODAL: NOVO / EDITAR AGENDAMENTO
           ========================================================================= */}
@@ -1031,7 +1079,7 @@ export default function App() {
 }
 
 // =============================================================================
-// SUBCOMPONENT: APPOINTMENT MODAL
+// SUBCOMPONENT: APPOINTMENT MODAL (MOBILE-FIRST & COMPACT VISIBLE SELECTOR)
 // =============================================================================
 function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, onClose, onSave }) {
   const [clientName, setClientName] = useState(initialData?.clientName || '');
@@ -1041,7 +1089,7 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
   const [staffId, setStaffId] = useState(initialData?.staffId || staff[0]?.id);
   const [serviceIds, setServiceIds] = useState(initialData?.serviceIds || []);
   const [notes, setNotes] = useState(initialData?.notes || '');
-  const [categoryFilter, setCategoryFilter] = useState('todos');
+  const [activeCategory, setActiveCategory] = useState('cabelo');
 
   const toggleService = (id) => {
     setServiceIds(prev =>
@@ -1062,6 +1110,13 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
       return sum + (s?.duration || 0);
     }, 0);
   }, [serviceIds, services]);
+
+  const getCategoryCount = (cat) => {
+    return serviceIds.filter(id => {
+      const s = services.find(x => x.id === id);
+      return s?.category === cat;
+    }).length;
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1091,12 +1146,13 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
   return (
     <div className="modal-overlay">
       <div className="modal-content">
+        <div className="sheet-handle"></div>
         <div className="modal-header">
           <h3>{initialData ? 'Editar Agendamento' : 'Novo Agendamento'}</h3>
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div className="modal-body">
             <div className="form-group">
               <label>Nome Completo da Cliente *</label>
@@ -1110,7 +1166,7 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-row">
               <div className="form-group">
                 <label>WhatsApp (com DDD) *</label>
                 <input
@@ -1131,13 +1187,13 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
                   onChange={e => setStaffId(e.target.value)}
                 >
                   {staff.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.role.split('&')[0]})</option>
+                    <option key={s.id} value={s.id}>{s.name} ({s.role.split('&')[0].trim()})</option>
                   ))}
                 </select>
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-row">
               <div className="form-group">
                 <label>Data</label>
                 <input
@@ -1161,73 +1217,73 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
               </div>
             </div>
 
-            {/* Select Services */}
+            {/* Compact, Highly Visible Services Section */}
             <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label>Serviços Desejados (Selecione quantos desejar)</label>
-                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--rose-600)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                <label>Serviços Desejados</label>
+                <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--rose-600)' }}>
                   Total: R$ {calculatedTotal.toFixed(2).replace('.', ',')} ({calculatedDuration} min)
                 </span>
               </div>
 
-              {/* Category Quick Filter */}
-              <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
-                {['todos', 'cabelo', 'sobrancelhas', 'depilacao'].map(c => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => setCategoryFilter(c)}
-                    style={{
-                      fontSize: '0.72rem',
-                      fontWeight: '600',
-                      padding: '2px 8px',
-                      borderRadius: 'var(--radius-full)',
-                      background: categoryFilter === c ? 'var(--rose-500)' : 'var(--bg-app)',
-                      color: categoryFilter === c ? '#fff' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)'
-                    }}
-                  >
-                    {c.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-
-              <div className="service-select-grid">
-                {services
-                  .filter(s => categoryFilter === 'todos' || s.category === categoryFilter)
-                  .map(s => {
-                    const isSelected = serviceIds.includes(s.id);
+              <div className="service-compact-section">
+                {/* Category Navigation Pills */}
+                <div className="service-category-nav">
+                  {[
+                    { id: 'cabelo', label: '✂️ Cabelo' },
+                    { id: 'sobrancelhas', label: '✨ Sobrancelhas' },
+                    { id: 'depilacao', label: '🌸 Depilação' }
+                  ].map(cat => {
+                    const count = getCategoryCount(cat.id);
                     return (
-                      <div
-                        key={s.id}
-                        className={`service-option-item ${isSelected ? 'selected' : ''}`}
-                        onClick={() => toggleService(s.id)}
+                      <button
+                        type="button"
+                        key={cat.id}
+                        className={`category-tab-pill ${activeCategory === cat.id ? 'active' : ''}`}
+                        onClick={() => setActiveCategory(cat.id)}
                       >
-                        <div style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '4px',
-                          border: '1px solid var(--rose-400)',
-                          background: isSelected ? 'var(--rose-500)' : 'transparent',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#fff',
-                          flexShrink: 0
-                        }}>
-                          {isSelected && <Check size={12} />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '0.8rem', fontWeight: '600', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {s.name}
-                          </p>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            R$ {s.price} • {s.duration} min
-                          </span>
-                        </div>
-                      </div>
+                        <span>{cat.label}</span>
+                        {count > 0 && <span className="pill-counter">{count}</span>}
+                      </button>
                     );
                   })}
+                </div>
+
+                {/* Clean, Full-Width, Non-Truncated List */}
+                <div className="service-clean-list">
+                  {services
+                    .filter(s => s.category === activeCategory)
+                    .map(s => {
+                      const isSelected = serviceIds.includes(s.id);
+                      return (
+                        <div
+                          key={s.id}
+                          className={`service-clean-row ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleService(s.id)}
+                        >
+                          <div className="service-row-left">
+                            <div className="service-custom-checkbox">
+                              {isSelected && <Check size={13} strokeWidth={3} />}
+                            </div>
+                            <span className="service-name-text">{s.name}</span>
+                          </div>
+                          <span className="service-price-pill">
+                            R$ {s.price} • {s.duration}m
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+
+                {/* Selected Summary Bar */}
+                {serviceIds.length > 0 && (
+                  <div className="selected-summary-bar">
+                    <span>
+                      ✨ <strong>{serviceIds.length}</strong> selecionado(s)
+                    </span>
+                    <strong>R$ {calculatedTotal.toFixed(2).replace('.', ',')}</strong>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1256,7 +1312,7 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
 }
 
 // =============================================================================
-// SUBCOMPONENT: CHECKOUT MODAL (FECHAR COMANDA)
+// SUBCOMPONENT: CHECKOUT MODAL (FECHAR COMANDA - MOBILE FIRST)
 // =============================================================================
 function CheckoutModal({ appointment, services, products, onClose, onConfirm }) {
   const [selectedServices, setSelectedServices] = useState(appointment.serviceIds);
@@ -1303,6 +1359,7 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
   return (
     <div className="modal-overlay">
       <div className="modal-content">
+        <div className="sheet-handle"></div>
         <div className="modal-header">
           <div>
             <h3>Fechar Comanda & Receber</h3>
@@ -1310,7 +1367,7 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
               Cliente: <strong>{appointment.clientName}</strong>
             </span>
           </div>
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
         </div>
 
         <div className="modal-body">
@@ -1324,7 +1381,7 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
                 const s = services.find(x => x.id === id);
                 if (!s) return null;
                 return (
-                  <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--rose-50)', borderRadius: '6px', fontSize: '0.88rem' }}>
+                  <div key={id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--rose-50)', borderRadius: '8px', fontSize: '0.88rem' }}>
                     <span>{s.name}</span>
                     <strong>R$ {s.price.toFixed(2).replace('.', ',')}</strong>
                   </div>
@@ -1353,13 +1410,17 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
                       }
                     }}
                     style={{
-                      padding: '4px 10px',
+                      padding: '6px 12px',
                       borderRadius: 'var(--radius-full)',
-                      fontSize: '0.78rem',
+                      fontSize: '0.8rem',
                       fontWeight: '600',
                       background: isAdded ? 'var(--rose-500)' : 'var(--bg-app)',
                       color: isAdded ? '#fff' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)'
+                      border: '1px solid var(--border-subtle)',
+                      minHeight: '38px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
                     }}
                   >
                     {isAdded ? '✓ ' : '+ '} {p.name} (R$ {p.price})
@@ -1370,7 +1431,7 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
           </div>
 
           {/* Discount Field */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div className="form-row">
             <div className="form-group">
               <label>Desconto Especial (R$)</label>
               <input
@@ -1449,6 +1510,7 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
     </div>
   );
 }
+
 
 // =============================================================================
 // SUBCOMPONENT: NEW SERVICE MODAL
