@@ -21,70 +21,103 @@ import {
   Sun,
   Download,
   Upload,
-  ArrowRight,
   UserCheck,
   Check,
   X,
-  CreditCard,
-  Banknote,
-  QrCode
+  ShieldCheck,
+  UserPlus,
+  RefreshCw,
+  Sparkle
 } from 'lucide-react';
 import {
+  INITIAL_USERS,
   INITIAL_SERVICES,
-  INITIAL_STAFF,
-  INITIAL_APPOINTMENTS,
+  SUGGESTED_SERVICES_TEMPLATE,
   INITIAL_PRODUCTS,
+  INITIAL_APPOINTMENTS,
   INITIAL_EXPENSES
 } from './data/initialData';
 import './App.css';
 
 export default function App() {
   // Theme state
-  const [theme, setTheme] = useState(() => localStorage.getItem('bella_theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('belissima_theme') || 'light');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('bella_theme', theme);
+    localStorage.setItem('belissima_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
+  // Check version reset to guarantee fresh zeroed start for Belíssima
+  useEffect(() => {
+    const initialized = localStorage.getItem('belissima_v1_ready');
+    if (!initialized) {
+      localStorage.setItem('belissima_users', JSON.stringify(INITIAL_USERS));
+      localStorage.setItem('belissima_services', JSON.stringify(INITIAL_SERVICES));
+      localStorage.setItem('belissima_appointments', JSON.stringify(INITIAL_APPOINTMENTS));
+      localStorage.setItem('belissima_expenses', JSON.stringify(INITIAL_EXPENSES));
+      localStorage.setItem('belissima_v1_ready', 'true');
+    }
+  }, []);
+
   // Main Entities State with LocalStorage
+  const [users, setUsers] = useState(() => {
+    const saved = localStorage.getItem('belissima_users');
+    return saved ? JSON.parse(saved) : INITIAL_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState(() => {
+    const savedId = localStorage.getItem('belissima_active_user_id');
+    const found = users.find(u => u.id === savedId);
+    return found || users[0] || INITIAL_USERS[0];
+  });
+
   const [services, setServices] = useState(() => {
-    const saved = localStorage.getItem('bella_services');
+    const saved = localStorage.getItem('belissima_services');
     return saved ? JSON.parse(saved) : INITIAL_SERVICES;
   });
 
   const [appointments, setAppointments] = useState(() => {
-    const saved = localStorage.getItem('bella_appointments');
+    const saved = localStorage.getItem('belissima_appointments');
     return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
   });
 
   const [expenses, setExpenses] = useState(() => {
-    const saved = localStorage.getItem('bella_expenses');
+    const saved = localStorage.getItem('belissima_expenses');
     return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
   });
 
   const [products] = useState(INITIAL_PRODUCTS);
-  const [staff] = useState(INITIAL_STAFF);
 
   // Sync state to LocalStorage
   useEffect(() => {
-    localStorage.setItem('bella_services', JSON.stringify(services));
+    localStorage.setItem('belissima_users', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      localStorage.setItem('belissima_active_user_id', currentUser.id);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('belissima_services', JSON.stringify(services));
   }, [services]);
 
   useEffect(() => {
-    localStorage.setItem('bella_appointments', JSON.stringify(appointments));
+    localStorage.setItem('belissima_appointments', JSON.stringify(appointments));
   }, [appointments]);
 
   useEffect(() => {
-    localStorage.setItem('bella_expenses', JSON.stringify(expenses));
+    localStorage.setItem('belissima_expenses', JSON.stringify(expenses));
   }, [expenses]);
 
-  // Navigation
-  const [activeTab, setActiveTab] = useState('agenda'); // 'agenda', 'caixa', 'servicos', 'clientes', 'financeiro'
+  // Navigation: 'agenda', 'caixa', 'servicos', 'clientes', 'equipe', 'financeiro'
+  const [activeTab, setActiveTab] = useState('agenda');
 
   // Date Filter (defaults to today)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -93,7 +126,7 @@ export default function App() {
   // Status Filter in Agenda
   const [statusFilter, setStatusFilter] = useState('todos');
 
-  // Search in Clients / Services
+  // Search in Clients / Services / Team
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals state
@@ -106,6 +139,11 @@ export default function App() {
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
 
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+
+  const [isSwitchUserModalOpen, setIsSwitchUserModalOpen] = useState(false);
+
   // Toast / Feedback message
   const [toastMessage, setToastMessage] = useState('');
   const showToast = (msg) => {
@@ -113,7 +151,7 @@ export default function App() {
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  // Appointments for Selected Date
+  // Filtered Appointments
   const filteredAppointments = useMemo(() => {
     return appointments.filter(apt => {
       const matchDate = apt.date === selectedDate;
@@ -197,16 +235,15 @@ export default function App() {
 
     const dateFormatted = apt.date.split('-').reverse().join('/');
     const text = encodeURIComponent(
-      `Olá, ${apt.clientName}! ✨ Tudo bem?\n\nPassando para confirmar seu horário no *Bella Studio & Co.*:\n📅 *Data:* ${dateFormatted} às *${apt.time}h*\n✂️ *Serviço(s):* ${serviceNames}\n\nPodemos confirmar? Qualquer dúvida ou se precisar ajustar, é só me avisar aqui. Te esperamos com muito carinho! 💕`
+      `Olá, ${apt.clientName}! ✨ Tudo bem?\n\nPassando para confirmar seu horário no *Belíssima*:\n📅 *Data:* ${dateFormatted} às *${apt.time}h*\n✂️ *Serviço(s):* ${serviceNames}\n\nPodemos confirmar? Qualquer dúvida ou se precisar ajustar, é só me avisar aqui. Te esperamos com muito carinho! 💕`
     );
 
     const cleanPhone = apt.clientPhone.replace(/\D/g, '');
     const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
     window.open(`https://api.whatsapp.com/send?phone=${fullPhone}&text=${text}`, '_blank');
-    showToast('Link do WhatsApp aberto com a mensagem pronta!');
+    showToast('WhatsApp aberto com a mensagem do Belíssima pronta!');
   };
 
-  // Quick Action: Start Service
   const handleStartService = (aptId) => {
     setAppointments(prev =>
       prev.map(a => (a.id === aptId ? { ...a, status: 'atendendo' } : a))
@@ -214,13 +251,11 @@ export default function App() {
     showToast('Atendimento iniciado! Cliente na cadeira.');
   };
 
-  // Quick Action: Open Checkout Modal
   const handleOpenCheckout = (apt) => {
     setCheckoutAppointment(apt);
     setIsCheckoutModalOpen(true);
   };
 
-  // Quick Action: Delete / Cancel Appointment
   const handleDeleteAppointment = (aptId) => {
     if (window.confirm('Tem certeza que deseja cancelar/remover este agendamento?')) {
       setAppointments(prev => prev.filter(a => a.id !== aptId));
@@ -228,9 +263,38 @@ export default function App() {
     }
   };
 
+  // System Zero Reset Action
+  const handleResetSystemToZero = () => {
+    const confirmText = window.prompt(
+      '⚠️ ATENÇÃO: Deseja ZERAR o sistema para cadastrar tudo do zero?\n\nDigite "ZERAR" para confirmar a limpeza total de agendamentos, despesas e serviços:'
+    );
+    if (confirmText === 'ZERAR') {
+      setAppointments([]);
+      setExpenses([]);
+      setServices([]);
+      setUsers(INITIAL_USERS);
+      setCurrentUser(INITIAL_USERS[0]);
+      localStorage.setItem('belissima_appointments', JSON.stringify([]));
+      localStorage.setItem('belissima_expenses', JSON.stringify([]));
+      localStorage.setItem('belissima_services', JSON.stringify([]));
+      localStorage.setItem('belissima_users', JSON.stringify(INITIAL_USERS));
+      showToast('Sistema Belíssima zerado com sucesso! Pronto para cadastrar do zero.');
+    }
+  };
+
+  // Load Suggested Template Services
+  const handleLoadTemplateServices = () => {
+    if (window.confirm('Deseja carregar as 18 sugestões de serviços para Cabelos, Sobrancelhas e Depilação?')) {
+      setServices(SUGGESTED_SERVICES_TEMPLATE);
+      showToast('Catálogo modelo de serviços carregado!');
+    }
+  };
+
   // Export / Import Backup JSON
   const exportBackup = () => {
     const data = {
+      system: 'Belíssima',
+      users,
       services,
       appointments,
       expenses,
@@ -240,9 +304,9 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bella-studio-backup-${todayStr}.json`;
+    a.download = `belissima-backup-${todayStr}.json`;
     a.click();
-    showToast('Backup exportado com sucesso!');
+    showToast('Backup do Belíssima exportado!');
   };
 
   const importBackup = (e) => {
@@ -255,8 +319,9 @@ export default function App() {
         if (parsed.services && parsed.appointments) {
           setServices(parsed.services);
           setAppointments(parsed.appointments);
+          if (parsed.users) setUsers(parsed.users);
           if (parsed.expenses) setExpenses(parsed.expenses);
-          showToast('Backup restaurado com sucesso!');
+          showToast('Backup do Belíssima restaurado com sucesso!');
         } else {
           alert('Arquivo de backup inválido.');
         }
@@ -273,8 +338,8 @@ export default function App() {
       {toastMessage && (
         <div style={{
           position: 'fixed',
-          bottom: '24px',
-          right: '24px',
+          bottom: '80px',
+          right: '20px',
           background: 'var(--text-primary)',
           color: 'var(--text-inverse)',
           padding: '12px 20px',
@@ -297,18 +362,35 @@ export default function App() {
         <div className="header-container">
           <div className="brand-section">
             <div className="brand-icon-box">
-              <Sparkles size={24} />
+              <Sparkles size={22} />
             </div>
             <div className="brand-titles">
-              <h1>Bella Studio & Co.</h1>
-              <span className="brand-tagline">Cabelo • Sobrancelhas • Depilação</span>
+              <h1>Belíssima</h1>
+              <span className="brand-tagline">Salão Feminino • Gestão Enxuta</span>
             </div>
           </div>
 
           <div className="header-actions">
+            {/* Active User Switcher Pill */}
+            <div
+              className="user-session-pill"
+              onClick={() => setIsSwitchUserModalOpen(true)}
+              title="Clique para alternar o usuário / operador"
+            >
+              <div className="user-avatar-sm">
+                {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className="user-session-text">
+                <span className="user-session-name">{currentUser?.name?.split(' ')[0]}</span>
+                <span className="user-session-role">
+                  {currentUser?.role === 'admin' ? '👑 Admin' : currentUser?.role === 'recepcao' ? '💼 Recepção' : '✂️ Profissional'}
+                </span>
+              </div>
+            </div>
+
             {/* Quick Date Selector */}
             <div className="date-selector-wrapper">
-              <Calendar size={16} color="var(--rose-500)" />
+              <Calendar size={15} color="var(--rose-500)" />
               <input
                 type="date"
                 value={selectedDate}
@@ -336,7 +418,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Navigation Tabs (Merged & Lean) */}
+      {/* Desktop Nav Tabs Bar */}
       <nav className="nav-tabs-bar">
         <div className="nav-tabs-container">
           <button
@@ -345,7 +427,7 @@ export default function App() {
           >
             <Calendar size={18} />
             <span>Agenda & Atendimentos</span>
-            <span className="tab-badge">{filteredAppointments.length}</span>
+            {filteredAppointments.length > 0 && <span className="tab-badge">{filteredAppointments.length}</span>}
           </button>
 
           <button
@@ -362,6 +444,7 @@ export default function App() {
           >
             <Scissors size={18} />
             <span>Serviços & Preços</span>
+            {services.length > 0 && <span className="tab-badge">{services.length}</span>}
           </button>
 
           <button
@@ -373,11 +456,20 @@ export default function App() {
           </button>
 
           <button
+            className={`tab-btn ${activeTab === 'equipe' ? 'active' : ''}`}
+            onClick={() => setActiveTab('equipe')}
+          >
+            <ShieldCheck size={18} />
+            <span>Controle de Usuários</span>
+            <span className="tab-badge">{users.length}</span>
+          </button>
+
+          <button
             className={`tab-btn ${activeTab === 'financeiro' ? 'active' : ''}`}
             onClick={() => setActiveTab('financeiro')}
           >
             <TrendingUp size={18} />
-            <span>Financeiro & Backup</span>
+            <span>Financeiro & Config</span>
           </button>
         </div>
       </nav>
@@ -434,8 +526,8 @@ export default function App() {
           <section className="fade-in">
             <div className="section-header">
               <div className="section-title-wrap">
-                <h2>Agenda do Dia</h2>
-                <p>Gerencie horários, inicie atendimentos e envie lembretes no WhatsApp com 1 clique.</p>
+                <h2>Agenda do Dia — Belíssima</h2>
+                <p>Gerencie horários, inicie atendimentos e envie confirmações de WhatsApp com 1 toque.</p>
               </div>
 
               {/* Status Filters */}
@@ -461,8 +553,8 @@ export default function App() {
             {filteredAppointments.length === 0 ? (
               <div className="empty-state">
                 <Calendar size={48} />
-                <h3>Nenhum agendamento para este filtro</h3>
-                <p>Clique no botão abaixo para adicionar a primeira cliente do dia!</p>
+                <h3>Nenhum agendamento para esta data</h3>
+                <p>O sistema está zerado e pronto para os novos atendimentos do salão!</p>
                 <button
                   className="btn-primary"
                   onClick={() => {
@@ -470,13 +562,13 @@ export default function App() {
                     setIsAppointmentModalOpen(true);
                   }}
                 >
-                  <Plus size={16} /> Adicionar Agendamento
+                  <Plus size={16} /> Novo Agendamento
                 </button>
               </div>
             ) : (
               <div className="appointments-grid">
                 {filteredAppointments.map(apt => {
-                  const staffMember = staff.find(s => s.id === apt.staffId);
+                  const staffMember = users.find(u => u.id === apt.staffId);
                   const aptServices = apt.serviceIds
                     .map(id => services.find(s => s.id === id))
                     .filter(Boolean);
@@ -535,7 +627,6 @@ export default function App() {
                         </div>
 
                         <div className="card-actions-row">
-                          {/* WhatsApp Reminder */}
                           <button
                             className="btn-whatsapp"
                             onClick={() => sendWhatsApp(apt)}
@@ -545,7 +636,6 @@ export default function App() {
                             <span>Avisar</span>
                           </button>
 
-                          {/* Action according to Status */}
                           {apt.status === 'agendado' && (
                             <button
                               className="btn-start"
@@ -572,10 +662,9 @@ export default function App() {
                             </span>
                           )}
 
-                          {/* Edit / Remove */}
                           <button
                             className="btn-icon"
-                            style={{ width: '32px', height: '32px' }}
+                            style={{ width: '34px', height: '34px' }}
                             onClick={() => {
                               setEditingAppointment(apt);
                               setIsAppointmentModalOpen(true);
@@ -587,7 +676,7 @@ export default function App() {
 
                           <button
                             className="btn-icon"
-                            style={{ width: '32px', height: '32px', color: '#dc2626' }}
+                            style={{ width: '34px', height: '34px', color: '#dc2626' }}
                             onClick={() => handleDeleteAppointment(apt.id)}
                             title="Excluir agendamento"
                           >
@@ -609,7 +698,7 @@ export default function App() {
             <div className="section-header">
               <div className="section-title-wrap">
                 <h2>Caixa & Comandas do Dia</h2>
-                <p>Controle de recebimentos, histórico de pagamentos e fechamento rápido.</p>
+                <p>Controle de recebimentos, pagamentos e fechamento rápido.</p>
               </div>
 
               <button
@@ -622,7 +711,7 @@ export default function App() {
                     clientName: '',
                     clientPhone: '',
                     serviceIds: [],
-                    staffId: 'st-1',
+                    staffId: users[0]?.id || 'usr-1',
                     status: 'atendendo',
                     notes: 'Atendimento Avulso de Balcão'
                   });
@@ -633,10 +722,9 @@ export default function App() {
               </button>
             </div>
 
-            {/* Comandas Realizadas */}
             <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
-              <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Comandas Pagas Hoje ({selectedDate.split('-').reverse().join('/')})</h3>
+              <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Comandas Pagas ({selectedDate.split('-').reverse().join('/')})</h3>
                 <span style={{ fontWeight: '700', color: 'var(--rose-600)', fontSize: '1.15rem' }}>
                   Total: R$ {dailyStats.totalRevenue.toFixed(2).replace('.', ',')}
                 </span>
@@ -658,7 +746,7 @@ export default function App() {
                     {appointments
                       .filter(a => a.date === selectedDate && a.status === 'concluido' && a.payment)
                       .map(apt => {
-                        const st = staff.find(s => s.id === apt.staffId);
+                        const st = users.find(u => u.id === apt.staffId);
                         const sNames = apt.serviceIds.map(id => services.find(x => x.id === id)?.name).filter(Boolean).join(', ');
                         return (
                           <tr key={apt.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -687,8 +775,8 @@ export default function App() {
                       })}
                     {appointments.filter(a => a.date === selectedDate && a.status === 'concluido' && a.payment).length === 0 && (
                       <tr>
-                        <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                          Nenhuma comanda fechada para a data selecionada ainda.
+                        <td colSpan={6} style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          Nenhuma comanda fechada para a data selecionada.
                         </td>
                       </tr>
                     )}
@@ -705,92 +793,113 @@ export default function App() {
             <div className="section-header">
               <div className="section-title-wrap">
                 <h2>Catálogo de Serviços Especializados</h2>
-                <p>Cardápio enxuto focado exclusivamente em Cabelo Feminino, Sobrancelhas e Depilação.</p>
+                <p>Cardápio focado em Cabelo Feminino, Sobrancelhas e Depilação.</p>
               </div>
 
-              <button
-                className="btn-primary"
-                onClick={() => setIsServiceModalOpen(true)}
-              >
-                <Plus size={16} /> Novo Serviço
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {services.length === 0 && (
+                  <button className="btn-secondary" onClick={handleLoadTemplateServices}>
+                    <Sparkle size={16} color="var(--gold-accent)" />
+                    <span>Carregar Sugestões Prontas</span>
+                  </button>
+                )}
+                <button className="btn-primary" onClick={() => setIsServiceModalOpen(true)}>
+                  <Plus size={16} /> Novo Serviço
+                </button>
+              </div>
             </div>
 
-            {/* Categorized Services List */}
-            {['cabelo', 'sobrancelhas', 'depilacao'].map(categoryKey => {
-              const catTitle =
-                categoryKey === 'cabelo'
-                  ? '✂️ Cabelo Feminino (Cortes, Mechas, Escovas & Tratamentos)'
-                  : categoryKey === 'sobrancelhas'
-                  ? '✨ Sobrancelhas & Olhar (Design, Henna, Lamination & Micro)'
-                  : '🌸 Depilação Feminina (Cera Hipoalergênica & Conforto)';
-
-              const catServices = services.filter(s => s.category === categoryKey);
-
-              return (
-                <div key={categoryKey} style={{ marginBottom: '2rem' }}>
-                  <h3 style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontSize: '1.25rem',
-                    marginBottom: '0.85rem',
-                    color: 'var(--text-primary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem'
-                  }}>
-                    {catTitle}
-                  </h3>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-                    {catServices.map(s => (
-                      <div
-                        key={s.id}
-                        style={{
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border-subtle)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: '1.15rem',
-                          boxShadow: 'var(--shadow-sm)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          gap: '0.75rem'
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                            <h4 style={{ fontSize: '1rem', fontWeight: '700' }}>{s.name}</h4>
-                            <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--rose-600)', whiteSpace: 'nowrap' }}>
-                              R$ {s.price.toFixed(2).replace('.', ',')}
-                            </span>
-                          </div>
-                          <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
-                            {s.description}
-                          </p>
-                        </div>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={13} /> Duração média: {s.duration} min
-                          </span>
-                          <button
-                            style={{ color: '#dc2626' }}
-                            onClick={() => {
-                              if (window.confirm(`Deseja remover o serviço "${s.name}"?`)) {
-                                setServices(prev => prev.filter(item => item.id !== s.id));
-                                showToast('Serviço removido.');
-                              }
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {services.length === 0 ? (
+              <div className="empty-state">
+                <Scissors size={48} />
+                <h3>Nenhum serviço cadastrado ainda</h3>
+                <p>O catálogo está zerado. Você pode cadastrar seus serviços personalizados ou carregar a lista de sugestões com 1 clique.</p>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  <button className="btn-primary" onClick={() => setIsServiceModalOpen(true)}>
+                    <Plus size={16} /> Cadastrar Meu Primeiro Serviço
+                  </button>
+                  <button className="btn-secondary" onClick={handleLoadTemplateServices}>
+                    <Sparkles size={16} /> Puxar Sugestões Prontas
+                  </button>
                 </div>
-              );
-            })}
+              </div>
+            ) : (
+              ['cabelo', 'sobrancelhas', 'depilacao'].map(categoryKey => {
+                const catTitle =
+                  categoryKey === 'cabelo'
+                    ? '✂️ Cabelo Feminino (Cortes, Mechas, Escovas & Tratamentos)'
+                    : categoryKey === 'sobrancelhas'
+                    ? '✨ Sobrancelhas & Olhar (Design, Henna, Lamination & Micro)'
+                    : '🌸 Depilação Feminina (Cera Hipoalergênica & Conforto)';
+
+                const catServices = services.filter(s => s.category === categoryKey);
+                if (catServices.length === 0) return null;
+
+                return (
+                  <div key={categoryKey} style={{ marginBottom: '2rem' }}>
+                    <h3 style={{
+                      fontFamily: 'var(--font-serif)',
+                      fontSize: '1.25rem',
+                      marginBottom: '0.85rem',
+                      color: 'var(--text-primary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      {catTitle} ({catServices.length})
+                    </h3>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+                      {catServices.map(s => (
+                        <div
+                          key={s.id}
+                          style={{
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-md)',
+                            padding: '1.15rem',
+                            boxShadow: 'var(--shadow-sm)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            gap: '0.75rem'
+                          }}
+                        >
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                              <h4 style={{ fontSize: '1rem', fontWeight: '700' }}>{s.name}</h4>
+                              <span style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--rose-600)', whiteSpace: 'nowrap' }}>
+                                R$ {s.price.toFixed(2).replace('.', ',')}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.35rem' }}>
+                              {s.description}
+                            </p>
+                          </div>
+
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.5rem', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={13} /> {s.duration} min
+                            </span>
+                            <button
+                              style={{ color: '#dc2626' }}
+                              onClick={() => {
+                                if (window.confirm(`Deseja remover o serviço "${s.name}"?`)) {
+                                  setServices(prev => prev.filter(item => item.id !== s.id));
+                                  showToast('Serviço removido.');
+                                }
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </section>
         )}
 
@@ -799,16 +908,15 @@ export default function App() {
           <section className="fade-in">
             <div className="section-header">
               <div className="section-title-wrap">
-                <h2>Clientes & Fidelidade</h2>
-                <p>Histórico rápido de visitas, valores investidos e atalho direto para reconectar no WhatsApp.</p>
+                <h2>Clientes & Histórico de Visitas</h2>
+                <p>Controle automático de visitas e atalho para reconexão no WhatsApp.</p>
               </div>
 
-              {/* Search Bar */}
-              <div style={{ position: 'relative', minWidth: '280px' }}>
+              <div style={{ position: 'relative', minWidth: '260px' }}>
                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                 <input
                   type="text"
-                  placeholder="Buscar cliente por nome ou WhatsApp..."
+                  placeholder="Buscar cliente..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="form-input"
@@ -817,80 +925,215 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-              {clientsList.map(c => {
-                const sendClientReturnMsg = () => {
-                  const text = encodeURIComponent(
-                    `Olá, ${c.name}! 💕 Como estão seus cuidados? Passando para lembrar que estamos com horários especiais esta semana no *Bella Studio & Co.* Quer aproveitar para renovar seu visual? ✨`
+            {clientsList.length === 0 ? (
+              <div className="empty-state">
+                <Users size={48} />
+                <h3>Nenhuma cliente registrada ainda</h3>
+                <p>Ao criar agendamentos, o Belíssima cadastra e contabiliza as clientes automaticamente!</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+                {clientsList.map(c => {
+                  const sendClientReturnMsg = () => {
+                    const text = encodeURIComponent(
+                      `Olá, ${c.name}! 💕 Como estão seus cuidados? Passando para lembrar que estamos com horários abertos esta semana no *Belíssima*. Quer aproveitar para renovar seu visual? ✨`
+                    );
+                    const clean = c.phone.replace(/\D/g, '');
+                    const full = clean.startsWith('55') ? clean : `55${clean}`;
+                    window.open(`https://api.whatsapp.com/send?phone=${full}&text=${text}`, '_blank');
+                  };
+
+                  return (
+                    <div
+                      key={c.phone}
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-lg)',
+                        padding: '1.25rem',
+                        boxShadow: 'var(--shadow-sm)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                        <div>
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>{c.name}</h3>
+                          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{c.phone}</p>
+                        </div>
+                        <button
+                          className="btn-whatsapp"
+                          onClick={sendClientReturnMsg}
+                          title="Mandar mensagem de retorno"
+                        >
+                          <MessageCircle size={14} /> Chamar
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '1rem', background: 'var(--rose-50)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', marginBottom: '0.85rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>VISITAS</span>
+                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{c.totalVisits} vez(es)</strong>
+                        </div>
+                        <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: '1rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>TOTAL GASTO</span>
+                          <strong style={{ fontSize: '0.95rem', color: '#1b7440' }}>R$ {c.totalSpent.toFixed(2).replace('.', ',')}</strong>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Serviços Realizados:</span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                          {c.servicesDone.slice(0, 3).map((sn, idx) => (
+                            <span key={idx} style={{ fontSize: '0.72rem', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>
+                              {sn}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   );
-                  const clean = c.phone.replace(/\D/g, '');
-                  const full = clean.startsWith('55') ? clean : `55${clean}`;
-                  window.open(`https://api.whatsapp.com/send?phone=${full}&text=${text}`, '_blank');
-                };
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* TAB 5: CONTROLE DE USUÁRIOS & EQUIPE */}
+        {activeTab === 'equipe' && (
+          <section className="fade-in">
+            <div className="section-header">
+              <div className="section-title-wrap">
+                <h2>Controle de Usuários & Equipe</h2>
+                <p>Gerencie quem tem acesso ao sistema, perfis de permissão e comissões.</p>
+              </div>
+
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  setEditingUser(null);
+                  setIsUserModalOpen(true);
+                }}
+              >
+                <UserPlus size={16} /> Novo Usuário
+              </button>
+            </div>
+
+            <div className="users-grid">
+              {users.map(user => {
+                const isCurrentActive = currentUser?.id === user.id;
+
+                const roleLabel =
+                  user.role === 'admin'
+                    ? '👑 Administradora / Proprietária'
+                    : user.role === 'recepcao'
+                    ? '💼 Recepção & Caixa'
+                    : '✂️ Profissional / Atendente';
+
+                const roleClass = `role-${user.role}`;
 
                 return (
-                  <div
-                    key={c.phone}
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: 'var(--radius-lg)',
-                      padding: '1.25rem',
-                      boxShadow: 'var(--shadow-sm)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                      <div>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>{c.name}</h3>
-                        <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{c.phone}</p>
-                      </div>
-                      <button
-                        className="btn-whatsapp"
-                        onClick={sendClientReturnMsg}
-                        title="Mandar mensagem de retorno"
-                      >
-                        <MessageCircle size={14} /> Chamar
-                      </button>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '1rem', background: 'var(--rose-50)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', marginBottom: '0.85rem' }}>
-                      <div>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>VISITAS</span>
-                        <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{c.totalVisits} vez(es)</strong>
-                      </div>
-                      <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: '1rem' }}>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>TOTAL GASTO</span>
-                        <strong style={{ fontSize: '0.95rem', color: '#1b7440' }}>R$ {c.totalSpent.toFixed(2).replace('.', ',')}</strong>
-                      </div>
-                    </div>
-
+                  <article key={user.id} className="user-card">
                     <div>
-                      <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Serviços Favoritos:</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                        {c.servicesDone.slice(0, 3).map((sn, idx) => (
-                          <span key={idx} style={{ fontSize: '0.72rem', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>
-                            {sn}
+                      <div className="user-card-header">
+                        <div className="user-card-profile">
+                          <div className="user-avatar-lg">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 style={{ fontSize: '1.05rem', fontWeight: '700' }}>{user.name}</h3>
+                            <span className={`role-badge ${roleClass}`}>{roleLabel}</span>
+                          </div>
+                        </div>
+
+                        {isCurrentActive && (
+                          <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#1b7440', background: '#e2f4ea', padding: '3px 8px', borderRadius: 'var(--radius-full)' }}>
+                            ● Sessão Ativa
                           </span>
-                        ))}
+                        )}
+                      </div>
+
+                      <div style={{ marginTop: '0.85rem', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                        {user.email && <div><strong>Login/E-mail:</strong> {user.email}</div>}
+                        {user.phone && <div><strong>WhatsApp:</strong> {user.phone}</div>}
+                        <div><strong>Comissão:</strong> {user.commission}% sobre serviços</div>
+                        <div><strong>Status:</strong> <span style={{ color: user.status === 'ativo' ? '#1b7440' : '#dc2626', fontWeight: '600' }}>{user.status === 'ativo' ? 'Ativo' : 'Inativo'}</span></div>
+                      </div>
+
+                      {user.specialties && user.specialties.length > 0 && (
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: '600' }}>Especialidades:</span>
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                            {user.specialties.map(sp => (
+                              <span key={sp} className={`service-tag tag-${sp}`}>
+                                {sp.toUpperCase()}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
+                      <button
+                        className="btn-secondary"
+                        style={{ minHeight: '34px', fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                        onClick={() => {
+                          setCurrentUser(user);
+                          showToast(`Sessão alternada para ${user.name}!`);
+                        }}
+                      >
+                        {isCurrentActive ? 'Usuário Atual' : 'Usar Esta Conta'}
+                      </button>
+
+                      <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          className="btn-icon"
+                          style={{ width: '34px', height: '34px' }}
+                          onClick={() => {
+                            setEditingUser(user);
+                            setIsUserModalOpen(true);
+                          }}
+                          title="Editar Usuário"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+
+                        {users.length > 1 && (
+                          <button
+                            className="btn-icon"
+                            style={{ width: '34px', height: '34px', color: '#dc2626' }}
+                            onClick={() => {
+                              if (window.confirm(`Deseja remover o usuário ${user.name}?`)) {
+                                setUsers(prev => prev.filter(u => u.id !== user.id));
+                                if (currentUser?.id === user.id) {
+                                  setCurrentUser(users.find(u => u.id !== user.id));
+                                }
+                                showToast('Usuário removido.');
+                              }
+                            }}
+                            title="Remover Usuário"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
           </section>
         )}
 
-        {/* TAB 5: FINANCEIRO & BACKUP */}
+        {/* TAB 6: FINANCEIRO & CONFIG */}
         {activeTab === 'financeiro' && (
           <section className="fade-in">
             <div className="section-header">
               <div className="section-title-wrap">
-                <h2>Financeiro & Governança do Salão</h2>
-                <p>Controle simplificado de entradas, saídas rápidas e segurança de dados.</p>
+                <h2>Financeiro & Governança — Belíssima</h2>
+                <p>Controle de gastos rápidos, segurança de dados e reset do sistema.</p>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button className="btn-secondary" onClick={() => setIsExpenseModalOpen(true)}>
                   <Plus size={16} /> Nova Despesa
                 </button>
@@ -901,6 +1144,37 @@ export default function App() {
                   <Upload size={16} /> Importar Backup
                   <input type="file" accept=".json" onChange={importBackup} style={{ display: 'none' }} />
                 </label>
+              </div>
+            </div>
+
+            {/* Quick Actions & Reset Zone */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', marginBottom: '1.5rem' }}>
+              {/* Reset to Zero Card */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid #fca5a5', borderRadius: 'var(--radius-lg)', padding: '1.25rem', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#dc2626', marginBottom: '0.5rem' }}>
+                  <RefreshCw size={20} />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Zerar Sistema do Salão</h3>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Limpa todos os agendamentos, clientes e despesas para iniciar um novo período ou começar os lançamentos 100% do zero.
+                </p>
+                <button className="btn-danger" onClick={handleResetSystemToZero}>
+                  <Trash2 size={16} /> Zerar Dados para Iniciar do Zero
+                </button>
+              </div>
+
+              {/* Template Services Card */}
+              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-lg)', padding: '1.25rem', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--rose-600)', marginBottom: '0.5rem' }}>
+                  <Sparkles size={20} />
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>Sugestões de Serviços</h3>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+                  Carregue a qualquer momento a lista pré-configurada de cabelos, sobrancelhas e depilação para economizar tempo de digitação.
+                </p>
+                <button className="btn-secondary" onClick={handleLoadTemplateServices}>
+                  <Sparkles size={16} color="var(--gold-accent)" /> Carregar 18 Serviços Sugeridos
+                </button>
               </div>
             </div>
 
@@ -990,6 +1264,14 @@ export default function App() {
           </button>
 
           <button
+            className={`mobile-nav-btn ${activeTab === 'equipe' ? 'active' : ''}`}
+            onClick={() => setActiveTab('equipe')}
+          >
+            <ShieldCheck size={20} />
+            <span>Usuários</span>
+          </button>
+
+          <button
             className={`mobile-nav-btn ${activeTab === 'financeiro' ? 'active' : ''}`}
             onClick={() => setActiveTab('financeiro')}
           >
@@ -1007,7 +1289,7 @@ export default function App() {
           isOpen={isAppointmentModalOpen}
           initialData={editingAppointment}
           services={services}
-          staff={staff}
+          staff={users}
           defaultDate={selectedDate}
           onClose={() => setIsAppointmentModalOpen(false)}
           onSave={(newApt) => {
@@ -1035,7 +1317,6 @@ export default function App() {
           onConfirm={(updatedApt) => {
             setAppointments(prev => prev.map(a => (a.id === updatedApt.id ? updatedApt : a)));
             setIsCheckoutModalOpen(false);
-            // Trigger celebration confetti
             confetti({
               particleCount: 80,
               spread: 70,
@@ -1074,19 +1355,103 @@ export default function App() {
           }}
         />
       )}
+
+      {/* =========================================================================
+          MODAL: NOVO / EDITAR USUÁRIO
+          ========================================================================= */}
+      {isUserModalOpen && (
+        <UserModal
+          initialData={editingUser}
+          onClose={() => setIsUserModalOpen(false)}
+          onSave={(savedUser) => {
+            if (editingUser) {
+              setUsers(prev => prev.map(u => (u.id === savedUser.id ? savedUser : u)));
+              if (currentUser?.id === savedUser.id) {
+                setCurrentUser(savedUser);
+              }
+              showToast('Usuário atualizado com sucesso!');
+            } else {
+              setUsers(prev => [...prev, savedUser]);
+              showToast('Novo usuário cadastrado na equipe!');
+            }
+            setIsUserModalOpen(false);
+          }}
+        />
+      )}
+
+      {/* =========================================================================
+          MODAL: ALTERNAR OPERADOR / USUÁRIO ATIVO
+          ========================================================================= */}
+      {isSwitchUserModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '420px' }}>
+            <div className="sheet-handle"></div>
+            <div className="modal-header">
+              <h3>Alternar Usuário / Operador</h3>
+              <button onClick={() => setIsSwitchUserModalOpen(false)} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                Selecione quem está operando o sistema agora no <strong>Belíssima</strong>:
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                {users.map(u => {
+                  const isCurrent = currentUser?.id === u.id;
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => {
+                        setCurrentUser(u);
+                        setIsSwitchUserModalOpen(false);
+                        showToast(`Sessão agora ativa com ${u.name}!`);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '0.75rem 1rem',
+                        borderRadius: 'var(--radius-md)',
+                        background: isCurrent ? 'var(--rose-50)' : 'var(--bg-app)',
+                        border: isCurrent ? '1.5px solid var(--rose-400)' : '1px solid var(--border-subtle)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="user-avatar-sm" style={{ width: '32px', height: '32px', fontSize: '0.9rem' }}>
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <strong style={{ fontSize: '0.9rem', display: 'block' }}>{u.name}</strong>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--rose-500)', textTransform: 'uppercase' }}>
+                            {u.role === 'admin' ? '👑 Administradora' : u.role === 'recepcao' ? '💼 Recepção' : '✂️ Profissional'}
+                          </span>
+                        </div>
+                      </div>
+                      {isCurrent && <Check size={18} color="var(--rose-500)" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setIsSwitchUserModalOpen(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // =============================================================================
-// SUBCOMPONENT: APPOINTMENT MODAL (MOBILE-FIRST & COMPACT VISIBLE SELECTOR)
+// SUBCOMPONENT: APPOINTMENT MODAL
 // =============================================================================
 function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, onClose, onSave }) {
   const [clientName, setClientName] = useState(initialData?.clientName || '');
   const [clientPhone, setClientPhone] = useState(initialData?.clientPhone || '');
   const [date, setDate] = useState(initialData?.date || defaultDate);
   const [time, setTime] = useState(initialData?.time || '10:00');
-  const [staffId, setStaffId] = useState(initialData?.staffId || staff[0]?.id);
+  const [staffId, setStaffId] = useState(initialData?.staffId || staff[0]?.id || '');
   const [serviceIds, setServiceIds] = useState(initialData?.serviceIds || []);
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [activeCategory, setActiveCategory] = useState('cabelo');
@@ -1135,7 +1500,7 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
       clientPhone: clientPhone.trim() || '67999990000',
       date,
       time,
-      staffId,
+      staffId: staffId || staff[0]?.id,
       serviceIds,
       status: initialData?.status || 'agendado',
       notes,
@@ -1180,14 +1545,14 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
               </div>
 
               <div className="form-group">
-                <label>Profissional</label>
+                <label>Profissional Responsável</label>
                 <select
                   className="form-select"
                   value={staffId}
                   onChange={e => setStaffId(e.target.value)}
                 >
                   {staff.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.role.split('&')[0].trim()})</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
@@ -1226,65 +1591,70 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
                 </span>
               </div>
 
-              <div className="service-compact-section">
-                {/* Category Navigation Pills */}
-                <div className="service-category-nav">
-                  {[
-                    { id: 'cabelo', label: '✂️ Cabelo' },
-                    { id: 'sobrancelhas', label: '✨ Sobrancelhas' },
-                    { id: 'depilacao', label: '🌸 Depilação' }
-                  ].map(cat => {
-                    const count = getCategoryCount(cat.id);
-                    return (
-                      <button
-                        type="button"
-                        key={cat.id}
-                        className={`category-tab-pill ${activeCategory === cat.id ? 'active' : ''}`}
-                        onClick={() => setActiveCategory(cat.id)}
-                      >
-                        <span>{cat.label}</span>
-                        {count > 0 && <span className="pill-counter">{count}</span>}
-                      </button>
-                    );
-                  })}
+              {services.length === 0 ? (
+                <div style={{ padding: '1rem', textAlign: 'center', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    Nenhum serviço no catálogo ainda. Vá na aba "Serviços" para cadastrar ou carregar as sugestões!
+                  </p>
                 </div>
-
-                {/* Clean, Full-Width, Non-Truncated List */}
-                <div className="service-clean-list">
-                  {services
-                    .filter(s => s.category === activeCategory)
-                    .map(s => {
-                      const isSelected = serviceIds.includes(s.id);
+              ) : (
+                <div className="service-compact-section">
+                  <div className="service-category-nav">
+                    {[
+                      { id: 'cabelo', label: '✂️ Cabelo' },
+                      { id: 'sobrancelhas', label: '✨ Sobrancelhas' },
+                      { id: 'depilacao', label: '🌸 Depilação' }
+                    ].map(cat => {
+                      const count = getCategoryCount(cat.id);
                       return (
-                        <div
-                          key={s.id}
-                          className={`service-clean-row ${isSelected ? 'selected' : ''}`}
-                          onClick={() => toggleService(s.id)}
+                        <button
+                          type="button"
+                          key={cat.id}
+                          className={`category-tab-pill ${activeCategory === cat.id ? 'active' : ''}`}
+                          onClick={() => setActiveCategory(cat.id)}
                         >
-                          <div className="service-row-left">
-                            <div className="service-custom-checkbox">
-                              {isSelected && <Check size={13} strokeWidth={3} />}
-                            </div>
-                            <span className="service-name-text">{s.name}</span>
-                          </div>
-                          <span className="service-price-pill">
-                            R$ {s.price} • {s.duration}m
-                          </span>
-                        </div>
+                          <span>{cat.label}</span>
+                          {count > 0 && <span className="pill-counter">{count}</span>}
+                        </button>
                       );
                     })}
-                </div>
-
-                {/* Selected Summary Bar */}
-                {serviceIds.length > 0 && (
-                  <div className="selected-summary-bar">
-                    <span>
-                      ✨ <strong>{serviceIds.length}</strong> selecionado(s)
-                    </span>
-                    <strong>R$ {calculatedTotal.toFixed(2).replace('.', ',')}</strong>
                   </div>
-                )}
-              </div>
+
+                  <div className="service-clean-list">
+                    {services
+                      .filter(s => s.category === activeCategory)
+                      .map(s => {
+                        const isSelected = serviceIds.includes(s.id);
+                        return (
+                          <div
+                            key={s.id}
+                            className={`service-clean-row ${isSelected ? 'selected' : ''}`}
+                            onClick={() => toggleService(s.id)}
+                          >
+                            <div className="service-row-left">
+                              <div className="service-custom-checkbox">
+                                {isSelected && <Check size={13} strokeWidth={3} />}
+                              </div>
+                              <span className="service-name-text">{s.name}</span>
+                            </div>
+                            <span className="service-price-pill">
+                              R$ {s.price} • {s.duration}m
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {serviceIds.length > 0 && (
+                    <div className="selected-summary-bar">
+                      <span>
+                        ✨ <strong>{serviceIds.length}</strong> selecionado(s)
+                      </span>
+                      <strong>R$ {calculatedTotal.toFixed(2).replace('.', ',')}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -1312,13 +1682,13 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
 }
 
 // =============================================================================
-// SUBCOMPONENT: CHECKOUT MODAL (FECHAR COMANDA - MOBILE FIRST)
+// SUBCOMPONENT: CHECKOUT MODAL
 // =============================================================================
 function CheckoutModal({ appointment, services, products, onClose, onConfirm }) {
   const [selectedServices, setSelectedServices] = useState(appointment.serviceIds);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [discount, setDiscount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('pix'); // pix, credito, debito, dinheiro
+  const [paymentMethod, setPaymentMethod] = useState('pix');
   const [amountReceived, setAmountReceived] = useState('');
 
   const servicesTotal = useMemo(() => {
@@ -1371,7 +1741,6 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
         </div>
 
         <div className="modal-body">
-          {/* Services in Comanda */}
           <div>
             <label style={{ fontSize: '0.82rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
               Serviços Realizados:
@@ -1390,47 +1759,47 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
             </div>
           </div>
 
-          {/* Quick Add Product */}
-          <div>
-            <label style={{ fontSize: '0.82rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Venda de Produto Home Care (Opcional):
-            </label>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
-              {products.map(p => {
-                const isAdded = selectedProducts.some(x => x.id === p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      if (isAdded) {
-                        setSelectedProducts(prev => prev.filter(x => x.id !== p.id));
-                      } else {
-                        setSelectedProducts(prev => [...prev, p]);
-                      }
-                    }}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 'var(--radius-full)',
-                      fontSize: '0.8rem',
-                      fontWeight: '600',
-                      background: isAdded ? 'var(--rose-500)' : 'var(--bg-app)',
-                      color: isAdded ? '#fff' : 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)',
-                      minHeight: '38px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}
-                  >
-                    {isAdded ? '✓ ' : '+ '} {p.name} (R$ {p.price})
-                  </button>
-                );
-              })}
+          {products.length > 0 && (
+            <div>
+              <label style={{ fontSize: '0.82rem', fontWeight: '700', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                Venda de Produto Home Care (Opcional):
+              </label>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                {products.map(p => {
+                  const isAdded = selectedProducts.some(x => x.id === p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        if (isAdded) {
+                          setSelectedProducts(prev => prev.filter(x => x.id !== p.id));
+                        } else {
+                          setSelectedProducts(prev => [...prev, p]);
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-full)',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        background: isAdded ? 'var(--rose-500)' : 'var(--bg-app)',
+                        color: isAdded ? '#fff' : 'var(--text-secondary)',
+                        border: '1px solid var(--border-subtle)',
+                        minHeight: '38px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      {isAdded ? '✓ ' : '+ '} {p.name} (R$ {p.price})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Discount Field */}
           <div className="form-row">
             <div className="form-group">
               <label>Desconto Especial (R$)</label>
@@ -1458,7 +1827,6 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
             </div>
           </div>
 
-          {/* Cash Change Calculation */}
           {paymentMethod === 'dinheiro' && (
             <div style={{ background: 'var(--status-agendado-bg)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
               <div className="form-group">
@@ -1479,7 +1847,6 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
             </div>
           )}
 
-          {/* Summary Box */}
           <div style={{
             background: 'var(--rose-50)',
             border: '1.5px solid var(--rose-300)',
@@ -1511,6 +1878,159 @@ function CheckoutModal({ appointment, services, products, onClose, onConfirm }) 
   );
 }
 
+// =============================================================================
+// SUBCOMPONENT: USER / STAFF MODAL
+// =============================================================================
+function UserModal({ initialData, onClose, onSave }) {
+  const [name, setName] = useState(initialData?.name || '');
+  const [email, setEmail] = useState(initialData?.email || '');
+  const [phone, setPhone] = useState(initialData?.phone || '');
+  const [role, setRole] = useState(initialData?.role || 'profissional');
+  const [commission, setCommission] = useState(initialData?.commission ?? 50);
+  const [specialties, setSpecialties] = useState(initialData?.specialties || ['cabelo']);
+  const [status, setStatus] = useState(initialData?.status || 'ativo');
+
+  const toggleSpecialty = (sp) => {
+    setSpecialties(prev =>
+      prev.includes(sp) ? prev.filter(x => x !== sp) : [...prev, sp]
+    );
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      alert('Informe o nome do usuário.');
+      return;
+    }
+    onSave({
+      id: initialData?.id || `usr-${Date.now()}`,
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      role,
+      commission: Number(commission),
+      specialties,
+      status
+    });
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <div className="sheet-handle"></div>
+        <div className="modal-header">
+          <h3>{initialData ? 'Editar Usuário / Equipe' : 'Cadastrar Novo Usuário'}</h3>
+          <button onClick={onClose} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            <div className="form-group">
+              <label>Nome Completo *</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ex: Beatriz Lima"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Perfil de Acesso *</label>
+                <select className="form-select" value={role} onChange={e => setRole(e.target.value)}>
+                  <option value="admin">👑 Administradora / Proprietária (Acesso Total)</option>
+                  <option value="profissional">✂️ Profissional / Atendente</option>
+                  <option value="recepcao">💼 Recepção & Caixa</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Comissão Padrão (%)</label>
+                <input
+                  type="number"
+                  className="form-input"
+                  placeholder="Ex: 50"
+                  value={commission}
+                  onChange={e => setCommission(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>WhatsApp / Telefone</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Ex: 67999887766"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>E-mail / Login</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  placeholder="Ex: beatriz@belissima.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Especialidades Atendidas</label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                {[
+                  { id: 'cabelo', label: '✂️ Cabelo Feminino' },
+                  { id: 'sobrancelhas', label: '✨ Sobrancelhas' },
+                  { id: 'depilacao', label: '🌸 Depilação' }
+                ].map(sp => {
+                  const isChecked = specialties.includes(sp.id);
+                  return (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      onClick={() => toggleSpecialty(sp.id)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 'var(--radius-full)',
+                        fontSize: '0.8rem',
+                        fontWeight: '600',
+                        background: isChecked ? 'var(--rose-500)' : 'var(--bg-app)',
+                        color: isChecked ? '#fff' : 'var(--text-secondary)',
+                        border: '1px solid var(--border-subtle)'
+                      }}
+                    >
+                      {isChecked ? '✓ ' : '+ '} {sp.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Status do Usuário</label>
+              <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+                <option value="ativo">Ativo no Salão</option>
+                <option value="inativo">Inativo / Afastado</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn-primary">Salvar Usuário</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // =============================================================================
 // SUBCOMPONENT: NEW SERVICE MODAL
@@ -1541,9 +2061,10 @@ function NewServiceModal({ onClose, onSave }) {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
+        <div className="sheet-handle"></div>
         <div className="modal-header">
           <h3>Novo Serviço no Catálogo</h3>
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
@@ -1559,7 +2080,7 @@ function NewServiceModal({ onClose, onSave }) {
               />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-row">
               <div className="form-group">
                 <label>Categoria *</label>
                 <select className="form-select" value={category} onChange={e => setCategory(e.target.value)}>
@@ -1639,9 +2160,10 @@ function NewExpenseModal({ defaultDate, onClose, onSave }) {
   return (
     <div className="modal-overlay">
       <div className="modal-content">
+        <div className="sheet-handle"></div>
         <div className="modal-header">
           <h3>Nova Despesa Operacional</h3>
-          <button onClick={onClose}><X size={20} /></button>
+          <button onClick={onClose} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
@@ -1656,7 +2178,7 @@ function NewExpenseModal({ defaultDate, onClose, onSave }) {
                 required
               />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div className="form-row">
               <div className="form-group">
                 <label>Valor (R$) *</label>
                 <input

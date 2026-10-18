@@ -1,62 +1,85 @@
 /* ==========================================================================
-   BELLA STUDIO & CO. — LUXURY BEAUTY SALON DESIGN SYSTEM
-   Clean, intuitive, high-end aesthetic tailored for feminine beauty services.
+   BELÍSSIMA — PALETA LUXO: BEGE, VERDE QUARTEL (MILITAR) & DOURADO
+   Identidade visual nobre, terrosa e refinada para salão feminino.
    ========================================================================== */
 
 :root {
-  /* Harmonious Rose Gold & Luxury Beauty Palette */
-  --rose-50: #fbf6f5;
-  --rose-100: #f7ebe8;
-  --rose-200: #eed5ce;
-  --rose-300: #e0b4a8;
-  --rose-400: #ce8f80;
-  --rose-500: #b86e5e; /* Primary Brand Accent */
-  --rose-600: #9e5546;
-  --rose-700: #7d4134;
+  /* Verde Quartel (Verde Militar) Nobre */
+  --militar-50: #f4f6f2;
+  --militar-100: #e5eae0;
+  --militar-200: #cbd5c3;
+  --militar-300: #a7b99c;
+  --militar-400: #7b946e;
+  --militar-500: #4b5842; /* Verde Quartel Principal */
+  --militar-600: #3b4634; /* Verde Militar Intenso */
+  --militar-700: #2e3729; /* Verde Floresta / Quartel Profundo */
+  --militar-800: #22291f;
 
-  --champagne-light: #fefcf9;
-  --champagne-surface: #f9f4ef;
-  --champagne-border: #ede4db;
+  /* Bege & Areia / Linho Luxo */
+  --beige-50: #faf8f5;
+  --beige-100: #f4efe6;
+  --beige-200: #eae1d2;
+  --beige-300: #ded0bc;
+  --beige-400: #cca88b;
+  --beige-surface: #f7f4ee;
+  --beige-card: #ffffff;
+  --beige-border: #e3dbc9;
 
-  --gold-accent: #d4af37;
-  --gold-soft: #f4ecd6;
+  /* Dourado Nobre / Ouro Acetinado */
+  --gold-300: #dfc282;
+  --gold-400: #d4af5b;
+  --gold-500: #c5a059; /* Dourado Nobre */
+  --gold-600: #ad8942;
+  --gold-700: #8c6c2e;
+  --gold-soft-bg: #f9f4e6;
+  --gold-border: #e8d5aa;
 
-  /* Neutrals (Light Mode) */
-  --bg-app: #fcf9f7;
+  /* Aliases para o Design System */
+  --rose-50: var(--beige-50);
+  --rose-100: var(--beige-100);
+  --rose-200: var(--beige-200);
+  --rose-300: var(--gold-border);
+  --rose-400: var(--gold-500);
+  --rose-500: var(--militar-500); /* Cor Primária de Ação */
+  --rose-600: var(--militar-600);
+  --rose-700: var(--militar-700);
+
+  /* Neutrals (Modo Claro) */
+  --bg-app: #f6f3ed; /* Fundo Bege Quente */
   --bg-card: #ffffff;
-  --bg-card-hover: #faf6f4;
+  --bg-card-hover: #fcfbf8;
   --bg-modal: rgba(255, 255, 255, 0.98);
-  --border-subtle: #eedfd9;
-  --border-focus: #b86e5e;
+  --border-subtle: #e2dbce;
+  --border-focus: var(--militar-500);
 
-  --text-primary: #291e1d;
-  --text-secondary: #6e5e5b;
-  --text-muted: #9c8a87;
+  --text-primary: #252b21;
+  --text-secondary: #585f52;
+  --text-muted: #889083;
   --text-inverse: #ffffff;
 
   /* Status Colors */
-  --status-agendado-bg: #f4ebd0;
-  --status-agendado-text: #825f16;
-  --status-atendendo-bg: #fce7e3;
-  --status-atendendo-text: #b84d38;
-  --status-concluido-bg: #e2f4ea;
-  --status-concluido-text: #1b7440;
-  --status-cancelado-bg: #fbe3e4;
-  --status-cancelado-text: #962c32;
+  --status-agendado-bg: #f8f1de;
+  --status-agendado-text: #96701f;
+  --status-atendendo-bg: #eaf0e6;
+  --status-atendendo-text: #3b5a32;
+  --status-concluido-bg: #e2ede5;
+  --status-concluido-text: #1d5f38;
+  --status-cancelado-bg: #fae6e6;
+  --status-cancelado-text: #9c2b2b;
 
-  /* Category Accents */
-  --cat-cabelo: #b86e5e;
-  --cat-cabelo-bg: #fbf0ee;
-  --cat-sobrancelhas: #7e57c2;
-  --cat-sobrancelhas-bg: #f4effc;
-  --cat-depilacao: #d97706;
-  --cat-depilacao-bg: #fef7ed;
+  /* Categorias com nuances de Verde Militar, Dourado e Bege */
+  --cat-cabelo: #3b4634;
+  --cat-cabelo-bg: #edf2eb;
+  --cat-sobrancelhas: #8c6c2e;
+  --cat-sobrancelhas-bg: #faf4e6;
+  --cat-depilacao: #56644f;
+  --cat-depilacao-bg: #f2f5f0;
 
-  /* Elevation & Shadows */
-  --shadow-sm: 0 2px 8px rgba(184, 110, 94, 0.05);
-  --shadow-md: 0 8px 24px rgba(184, 110, 94, 0.08);
-  --shadow-lg: 0 16px 40px rgba(184, 110, 94, 0.12);
-  --shadow-float: 0 20px 50px rgba(41, 30, 29, 0.18);
+  /* Sombras */
+  --shadow-sm: 0 2px 8px rgba(75, 88, 66, 0.06);
+  --shadow-md: 0 8px 24px rgba(75, 88, 66, 0.09);
+  --shadow-lg: 0 16px 40px rgba(75, 88, 66, 0.12);
+  --shadow-float: 0 20px 50px rgba(37, 43, 33, 0.22);
 
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -68,25 +91,30 @@
 }
 
 [data-theme='dark'] {
-  --bg-app: #151112;
-  --bg-card: #201a1c;
-  --bg-card-hover: #292224;
-  --bg-modal: rgba(32, 26, 28, 0.98);
-  --border-subtle: #3a2e31;
-  --border-focus: #ce8f80;
+  --bg-app: #181c15; /* Verde Quartel Escuro Nobre */
+  --bg-card: #22271f;
+  --bg-card-hover: #2b3127;
+  --bg-modal: rgba(34, 39, 31, 0.98);
+  --border-subtle: #363e32;
+  --border-focus: var(--gold-400);
 
-  --text-primary: #faeeec;
-  --text-secondary: #c9b7b4;
-  --text-muted: #8c7875;
-  --text-inverse: #151112;
+  --text-primary: #f5f2ea;
+  --text-secondary: #c9cebe;
+  --text-muted: #8c9484;
+  --text-inverse: #181c15;
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
 
-  --cat-cabelo-bg: #352123;
-  --cat-sobrancelhas-bg: #291e36;
-  --cat-depilacao-bg: #362415;
+  --cat-cabelo-bg: #293224;
+  --cat-sobrancelhas-bg: #352f1f;
+  --cat-depilacao-bg: #273023;
+
+  --rose-50: #293125;
+  --rose-100: #333c2e;
+  --rose-200: #424e3c;
+  --rose-300: var(--gold-600);
 }
 
 /* Base Reset */
@@ -138,7 +166,7 @@ a {
   animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Scrollbar */
+/* Scrollbar com Bege & Verde Quartel */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -147,9 +175,9 @@ a {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--rose-200);
+  background: var(--beige-300);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--rose-300);
+  background: var(--militar-400);
 }
