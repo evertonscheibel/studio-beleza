@@ -71,17 +71,17 @@ export default function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Garantir que o catálogo de serviços esteja sempre preservado em produção
+  // Garantir que fique apenas o cadastro único de serviço incluído diretamente no sistema
   useEffect(() => {
-    const savedServices = localStorage.getItem('belissima_services');
-    if (!savedServices || savedServices === '[]') {
+    const singleServiceMigrated = localStorage.getItem('belissima_single_service_v2');
+    if (!singleServiceMigrated) {
       localStorage.setItem('belissima_services', JSON.stringify(INITIAL_SERVICES));
+      localStorage.setItem('belissima_single_service_v2', 'true');
       setServices(INITIAL_SERVICES);
     }
     const initialized = localStorage.getItem('belissima_v1_ready');
     if (!initialized) {
       localStorage.setItem('belissima_users', JSON.stringify(INITIAL_USERS));
-      localStorage.setItem('belissima_services', JSON.stringify(INITIAL_SERVICES));
       localStorage.setItem('belissima_appointments', JSON.stringify(INITIAL_APPOINTMENTS));
       localStorage.setItem('belissima_expenses', JSON.stringify(INITIAL_EXPENSES));
       localStorage.setItem('belissima_clients', JSON.stringify(INITIAL_CLIENTS));
@@ -108,14 +108,17 @@ export default function App() {
   });
 
   const [services, setServices] = useState(() => {
-    const saved = localStorage.getItem('belissima_services');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      } catch (e) {}
+    const singleServiceMigrated = localStorage.getItem('belissima_single_service_v2');
+    if (singleServiceMigrated) {
+      const saved = localStorage.getItem('belissima_services');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (e) {}
+      }
     }
     return INITIAL_SERVICES;
   });

@@ -32,9 +32,6 @@ export function ClientModal({ initialData, onClose, onSave }) {
   const [phone, setPhone] = useState(initialData?.phone || '');
   const [birthdate, setBirthdate] = useState(initialData?.birthdate || '');
   const [email, setEmail] = useState(initialData?.email || '');
-  const [hairProfile, setHairProfile] = useState(initialData?.hairProfile || '');
-  const [beautyProfile, setBeautyProfile] = useState(initialData?.beautyProfile || '');
-  const [notes, setNotes] = useState(initialData?.notes || '');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -53,16 +50,13 @@ export function ClientModal({ initialData, onClose, onSave }) {
       phone: phone.trim(),
       birthdate: birthdate.trim(),
       email: email.trim(),
-      hairProfile: hairProfile.trim(),
-      beautyProfile: beautyProfile.trim(),
-      notes: notes.trim(),
       createdAt: initialData?.createdAt || new Date().toISOString().split('T')[0]
     });
   };
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '580px' }}>
+      <div className="modal-content" style={{ maxWidth: '540px' }}>
         <div className="sheet-handle"></div>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
@@ -83,8 +77,8 @@ export function ClientModal({ initialData, onClose, onSave }) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-            {/* Informações Básicas */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.85rem' }}>
+            {/* Informações Básicas da Cliente */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem' }}>
               <div className="form-group">
                 <label>Nome Completo da Cliente *</label>
                 <input
@@ -110,7 +104,7 @@ export function ClientModal({ initialData, onClose, onSave }) {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '0.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.85rem', marginTop: '0.5rem' }}>
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                   <Cake size={14} color="var(--gold-500)" /> Data de Nascimento / Aniversário
@@ -133,50 +127,6 @@ export function ClientModal({ initialData, onClose, onSave }) {
                   onChange={e => setEmail(e.target.value)}
                 />
               </div>
-            </div>
-
-            {/* Ficha Capilar e Anamnese */}
-            <div style={{ marginTop: '0.5rem', background: 'var(--rose-50)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-              <h4 style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--militar-700)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Scissors size={15} color="var(--gold-500)" /> Perfil Capilar & Químicas
-              </h4>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Ex: Mechas loiras, progressiva sem formol, raiz oleosa e pontas secas..."
-                  value={hairProfile}
-                  onChange={e => setHairProfile(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Ficha Estética & Depilação */}
-            <div style={{ marginTop: '0.75rem', background: 'var(--rose-50)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-              <h4 style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--militar-700)', marginBottom: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Sparkles size={15} color="var(--gold-500)" /> Sobrancelhas, Cílios & Depilação
-              </h4>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Ex: Henna castanho médio, sensibilidade a cera quente, prefere pinça..."
-                  value={beautyProfile}
-                  onChange={e => setBeautyProfile(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {/* Observações Gerais */}
-            <div className="form-group" style={{ marginTop: '0.75rem' }}>
-              <label>Observações & Preferências da Cliente</label>
-              <textarea
-                className="form-input"
-                rows="2"
-                placeholder="Ex: Gosta de café sem açúcar, prefere atendimentos às quintas-feiras pela manhã..."
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-              ></textarea>
             </div>
           </div>
 

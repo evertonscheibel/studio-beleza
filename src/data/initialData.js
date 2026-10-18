@@ -40,8 +40,17 @@ export const SUGGESTED_SERVICES_TEMPLATE = [
   { id: 'dep-6', category: 'depilacao', name: 'Depilação de Braços', price: 40, duration: 30, description: 'Cera morna com hidratação calmante' },
 ];
 
-// Serviços iniciais mantidos em produção com catálogo feminino completo
-export const INITIAL_SERVICES = SUGGESTED_SERVICES_TEMPLATE;
+// Único serviço cadastrado diretamente no sistema
+export const INITIAL_SERVICES = [
+  {
+    id: 'srv-1',
+    category: 'cabelo',
+    name: 'Corte e Escova Modelada',
+    price: 150,
+    duration: 60,
+    description: 'Serviço profissional de alta qualidade.'
+  }
+];
 
 export const INITIAL_PRODUCTS = [];
 
