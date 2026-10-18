@@ -6,6 +6,7 @@ export const INITIAL_USERS = [
     email: 'admin@salao.com',
     phone: '',
     role: 'admin', // 'admin', 'profissional', 'recepcao'
+    password: 'admin', // Senha padrão inicial
     specialties: ['cabelo', 'sobrancelhas', 'depilacao'],
     commission: 100,
     status: 'ativo'
@@ -44,6 +45,7 @@ export const SUGGESTED_SERVICES_TEMPLATE = [
 
 export const INITIAL_PRODUCTS = [];
 
-// Base zerada de agendamentos e despesas
+// Base zerada de agendamentos, despesas e clientes
 export const INITIAL_APPOINTMENTS = [];
 export const INITIAL_EXPENSES = [];
+export const INITIAL_CLIENTS = [];

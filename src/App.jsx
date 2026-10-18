@@ -27,7 +27,21 @@ import {
   ShieldCheck,
   UserPlus,
   RefreshCw,
-  Sparkle
+  Sparkle,
+  Cake,
+  History,
+  Heart,
+  User,
+  Award,
+  Key,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  Share2,
+  ShieldAlert,
+  Copy
 } from 'lucide-react';
 import {
   INITIAL_USERS,
@@ -35,8 +49,13 @@ import {
   SUGGESTED_SERVICES_TEMPLATE,
   INITIAL_PRODUCTS,
   INITIAL_APPOINTMENTS,
-  INITIAL_EXPENSES
+  INITIAL_EXPENSES,
+  INITIAL_CLIENTS
 } from './data/initialData';
+import { calculateClientCRM, buildWhatsAppMessage } from './crmUtils';
+import { ClientModal, ClientDetailsModal } from './components/ClientModals';
+import { ResetPasswordModal } from './components/ResetPasswordModal';
+import { ClientBookingPortal } from './components/ClientBookingPortal';
 import './App.css';
 
 export default function App() {
@@ -60,6 +79,7 @@ export default function App() {
       localStorage.setItem('belissima_services', JSON.stringify(INITIAL_SERVICES));
       localStorage.setItem('belissima_appointments', JSON.stringify(INITIAL_APPOINTMENTS));
       localStorage.setItem('belissima_expenses', JSON.stringify(INITIAL_EXPENSES));
+      localStorage.setItem('belissima_clients', JSON.stringify(INITIAL_CLIENTS));
       localStorage.setItem('belissima_v1_ready', 'true');
     }
   }, []);
@@ -91,6 +111,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
   });
 
+  const [clients, setClients] = useState(() => {
+    const saved = localStorage.getItem('belissima_clients');
+    return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
+  });
+
   const [products] = useState(INITIAL_PRODUCTS);
 
   // Sync state to LocalStorage
@@ -115,6 +140,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('belissima_expenses', JSON.stringify(expenses));
   }, [expenses]);
+
+  useEffect(() => {
+    localStorage.setItem('belissima_clients', JSON.stringify(clients));
+  }, [clients]);
 
   // Navigation: 'agenda', 'caixa', 'servicos', 'clientes', 'equipe', 'financeiro'
   const [activeTab, setActiveTab] = useState('agenda');
@@ -143,6 +172,24 @@ export default function App() {
   const [editingUser, setEditingUser] = useState(null);
 
   const [isSwitchUserModalOpen, setIsSwitchUserModalOpen] = useState(false);
+  const [switchTargetUser, setSwitchTargetUser] = useState(null);
+  const [switchPasswordInput, setSwitchPasswordInput] = useState('');
+  const [switchPasswordError, setSwitchPasswordError] = useState('');
+
+  // Password Reset State
+  const [resetPasswordUser, setResetPasswordUser] = useState(null);
+
+  // Portal Mode (Public Client Self-Service Booking)
+  const [isPortalMode, setIsPortalMode] = useState(() => {
+    return window.location.search.includes('agendar=true') || window.location.search.includes('portal=true');
+  });
+
+  // CRM Modals state
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
+  const [isClientDetailsOpen, setIsClientDetailsOpen] = useState(false);
+  const [selectedClientCRM, setSelectedClientCRM] = useState(null);
+  const [clientFilter, setClientFilter] = useState('todos'); // 'todos', 'retorno', 'em_dia', 'ausentes', 'aniversariantes'
 
   // Toast / Feedback message
   const [toastMessage, setToastMessage] = useState('');
@@ -187,44 +234,165 @@ export default function App() {
     };
   }, [appointments, expenses, selectedDate]);
 
-  // Clients Aggregated from Appointments
-  const clientsList = useMemo(() => {
+  // Consolidated Clients (Explicit Clients + any registered via appointments)
+  const consolidatedClients = useMemo(() => {
     const map = new Map();
-    appointments.forEach(apt => {
-      const phone = apt.clientPhone.replace(/\D/g, '');
-      if (!phone) return;
 
-      const existing = map.get(phone) || {
-        name: apt.clientName,
-        phone: apt.clientPhone,
-        totalVisits: 0,
-        totalSpent: 0,
-        lastVisit: apt.date,
-        servicesDone: []
-      };
-
-      existing.totalVisits += 1;
-      if (apt.payment?.total) {
-        existing.totalSpent += apt.payment.total;
-      }
-      if (apt.date > existing.lastVisit) {
-        existing.lastVisit = apt.date;
-      }
-      apt.serviceIds.forEach(id => {
-        const s = services.find(x => x.id === id);
-        if (s && !existing.servicesDone.includes(s.name)) {
-          existing.servicesDone.push(s.name);
-        }
-      });
-
-      map.set(phone, existing);
+    // 1. Explicit clients
+    clients.forEach(c => {
+      const cleanPhone = (c.phone || '').replace(/\D/g, '') || c.id;
+      map.set(cleanPhone, { ...c });
     });
 
-    return Array.from(map.values()).filter(c =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phone.includes(searchQuery)
+    // 2. Discover clients from appointments
+    appointments.forEach(apt => {
+      const cleanPhone = (apt.clientPhone || '').replace(/\D/g, '');
+      if (!cleanPhone) return;
+      if (!map.has(cleanPhone)) {
+        map.set(cleanPhone, {
+          id: `cli-auto-${cleanPhone}`,
+          name: apt.clientName,
+          phone: apt.clientPhone,
+          birthdate: '',
+          email: '',
+          hairProfile: '',
+          beautyProfile: '',
+          notes: '',
+          createdAt: apt.date
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [clients, appointments]);
+
+  // CRM Enriched Clients
+  const crmClientsList = useMemo(() => {
+    const list = consolidatedClients.map(c => calculateClientCRM(c, appointments, services));
+
+    // Filter by search query
+    const filteredBySearch = list.filter(item => {
+      const q = searchQuery.toLowerCase();
+      return (
+        item.client.name.toLowerCase().includes(q) ||
+        (item.client.phone && item.client.phone.includes(q))
+      );
+    });
+
+    // Filter by CRM status tab
+    const currentMonth = new Date().getMonth() + 1;
+    return filteredBySearch.filter(item => {
+      if (clientFilter === 'retorno') return item.status === 'retorno_sugerido';
+      if (clientFilter === 'em_dia') return item.status === 'em_dia';
+      if (clientFilter === 'ausentes') return item.status === 'ausente';
+      if (clientFilter === 'aniversariantes') {
+        if (!item.client.birthdate) return false;
+        const bMonth = parseInt(item.client.birthdate.split('-')[1], 10);
+        return bMonth === currentMonth;
+      }
+      return true;
+    });
+  }, [consolidatedClients, appointments, services, searchQuery, clientFilter]);
+
+  // Overall CRM metrics for the dashboard header
+  const crmOverallStats = useMemo(() => {
+    const allCrm = consolidatedClients.map(c => calculateClientCRM(c, appointments, services));
+    const totalClients = allCrm.length;
+    const recallCount = allCrm.filter(c => c.status === 'retorno_sugerido').length;
+    const onTimeCount = allCrm.filter(c => c.status === 'em_dia').length;
+    const inactiveCount = allCrm.filter(c => c.status === 'ausente').length;
+    const totalSpentAll = allCrm.reduce((sum, c) => sum + c.totalSpent, 0);
+    const totalVisitsAll = allCrm.reduce((sum, c) => sum + c.totalVisits, 0);
+    const avgTicket = totalVisitsAll > 0 ? (totalSpentAll / totalVisitsAll) : 0;
+
+    return {
+      totalClients,
+      recallCount,
+      onTimeCount,
+      inactiveCount,
+      avgTicket
+    };
+  }, [consolidatedClients, appointments, services]);
+
+  // CRM Client Handlers
+  const handleSaveClient = (clientData) => {
+    if (editingClient) {
+      setClients(prev => prev.map(c => (c.id === clientData.id ? clientData : c)));
+      showToast('Cliente atualizada com sucesso!');
+    } else {
+      setClients(prev => [clientData, ...prev]);
+      showToast('Nova cliente cadastrada no Belíssima!');
+    }
+    setIsClientModalOpen(false);
+    setEditingClient(null);
+  };
+
+  const handleDeleteClient = (clientId) => {
+    if (window.confirm('Tem certeza que deseja excluir o cadastro desta cliente?')) {
+      setClients(prev => prev.filter(c => c.id !== clientId));
+      setIsClientDetailsOpen(false);
+      showToast('Cliente removida do cadastro.');
+    }
+  };
+
+  const handleOpenClientDetails = (crmItem) => {
+    setSelectedClientCRM(crmItem);
+    setIsClientDetailsOpen(true);
+  };
+
+  const handleScheduleForClient = (client) => {
+    setEditingAppointment({
+      clientName: client.name,
+      clientPhone: client.phone
+    });
+    setIsClientDetailsOpen(false);
+    setIsAppointmentModalOpen(true);
+  };
+
+  // Online Self-Service Appointments (Anti-Fake Queue)
+  const pendingOnlineAppointments = useMemo(() => {
+    return appointments.filter(a => a.status === 'pendente_online');
+  }, [appointments]);
+
+  const handleApproveOnlineBooking = (apt) => {
+    setAppointments(prev =>
+      prev.map(a => (a.id === apt.id ? { ...a, status: 'agendado' } : a))
     );
-  }, [appointments, services, searchQuery]);
+    // Guarantee client in CRM
+    const cleanPhone = (apt.clientPhone || '').replace(/\D/g, '');
+    const exists = clients.some(c => (c.phone && c.phone.replace(/\D/g, '') === cleanPhone) || c.name.toLowerCase() === apt.clientName.toLowerCase());
+    if (!exists) {
+      const newClient = {
+        id: `cli-${Date.now()}`,
+        name: apt.clientName,
+        phone: apt.clientPhone,
+        birthdate: '',
+        email: '',
+        hairProfile: '',
+        beautyProfile: '',
+        notes: apt.notes || '',
+        createdAt: apt.date
+      };
+      setClients(prev => [newClient, ...prev]);
+    }
+    showToast(`Agendamento de ${apt.clientName} aprovado e confirmado!`);
+  };
+
+  const handleRejectOnlineBooking = (aptId) => {
+    if (window.confirm('Deseja recusar esta solicitação de agendamento online?')) {
+      setAppointments(prev => prev.filter(a => a.id !== aptId));
+      showToast('Solicitação online recusada e removida.');
+    }
+  };
+
+  const handleSaveResetPassword = (userId, newPassword) => {
+    setUsers(prev => prev.map(u => (u.id === userId ? { ...u, password: newPassword } : u)));
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => ({ ...prev, password: newPassword }));
+    }
+    setResetPasswordUser(null);
+    showToast('Senha do usuário atualizada com sucesso!');
+  };
 
   // Quick Action: Send WhatsApp Confirmation
   const sendWhatsApp = (apt) => {
@@ -272,11 +440,13 @@ export default function App() {
       setAppointments([]);
       setExpenses([]);
       setServices([]);
+      setClients([]);
       setUsers(INITIAL_USERS);
       setCurrentUser(INITIAL_USERS[0]);
       localStorage.setItem('belissima_appointments', JSON.stringify([]));
       localStorage.setItem('belissima_expenses', JSON.stringify([]));
       localStorage.setItem('belissima_services', JSON.stringify([]));
+      localStorage.setItem('belissima_clients', JSON.stringify([]));
       localStorage.setItem('belissima_users', JSON.stringify(INITIAL_USERS));
       showToast('Sistema Belíssima zerado com sucesso! Pronto para cadastrar do zero.');
     }
@@ -331,6 +501,27 @@ export default function App() {
     };
     reader.readAsText(file);
   };
+
+  if (isPortalMode) {
+    return (
+      <ClientBookingPortal
+        services={services}
+        staff={users.filter(u => u.status !== 'inativo')}
+        appointments={appointments}
+        onBookingCreated={(newApt) => {
+          setAppointments(prev => [newApt, ...prev]);
+          showToast(`Horário pré-agendado com sucesso! Token: ${newApt.token}`);
+        }}
+        onExitPortal={() => {
+          setIsPortalMode(false);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('agendar');
+          url.searchParams.delete('portal');
+          window.history.replaceState({}, '', url.pathname);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app-layout">
@@ -398,9 +589,28 @@ export default function App() {
               />
             </div>
 
-            {/* Dark/Light Mode */}
-            <button className="btn-icon" onClick={toggleTheme} title="Alternar Modo Claro / Escuro">
-              {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            {/* Direct Booking Portal Link */}
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                const bookingUrl = `${window.location.origin}/?agendar=true`;
+                navigator.clipboard?.writeText(bookingUrl);
+                showToast('Link do portal copiado para enviar às clientes!');
+              }}
+              title="Copiar link direto para as clientes agendarem online"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', borderColor: 'var(--gold-400)', color: 'var(--militar-700)', background: 'var(--rose-50)' }}
+            >
+              <Share2 size={15} color="var(--gold-accent)" />
+              <span>Link p/ Clientes</span>
+            </button>
+
+            <button
+              className="btn-icon"
+              onClick={() => setIsPortalMode(true)}
+              title="Abrir e testar o Portal de Agendamento da Cliente"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <ExternalLink size={16} />
             </button>
 
             {/* New Appointment Button */}
@@ -548,6 +758,86 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* Banner de Pré-Agendamentos Online (Anti-Trotes & Validação) */}
+            {pendingOnlineAppointments.length > 0 && (
+              <div style={{
+                background: 'rgba(217, 119, 6, 0.08)',
+                border: '1.5px solid #d97706',
+                borderRadius: 'var(--radius-lg)',
+                padding: '16px 20px',
+                marginBottom: '20px'
+              }} className="fade-in">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <ShieldAlert size={24} color="#d97706" />
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1rem', color: '#b45309', fontWeight: '700' }}>
+                        {pendingOnlineAppointments.length} Solicitação(ões) de Agendamento Online Pendente(s)
+                      </h3>
+                      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        Proteção Anti-Fake • Valide com o WhatsApp da cliente e clique em Aprovar para incluir na agenda
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '12px' }}>
+                  {pendingOnlineAppointments.map(onlineApt => {
+                    const aptServices = onlineApt.serviceIds
+                      .map(id => services.find(s => s.id === id)?.name)
+                      .filter(Boolean)
+                      .join(', ');
+                    const aptStaff = users.find(u => u.id === onlineApt.staffId)?.name || 'Qualquer profissional';
+
+                    return (
+                      <div key={onlineApt.id} style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '14px',
+                        boxShadow: 'var(--shadow-sm)'
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                          <div>
+                            <strong style={{ fontSize: '0.98rem', color: 'var(--text-primary)' }}>{onlineApt.clientName}</strong>
+                            <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>📱 {onlineApt.clientPhone}</div>
+                          </div>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: '#fef3c7', color: '#92400e' }}>
+                            {onlineApt.token || 'Pendente'}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.85rem', marginBottom: '12px', color: 'var(--text-primary)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div>📅 <strong>{onlineApt.date.split('-').reverse().join('/')}</strong> às <strong>{onlineApt.time}h</strong></div>
+                          <div>✂️ <strong>Serviços:</strong> {aptServices || 'Nenhum selecionado'}</div>
+                          <div>👤 <strong>Profissional:</strong> {aptStaff}</div>
+                          {onlineApt.notes && <div style={{ fontStyle: 'italic', color: 'var(--text-muted)', fontSize: '0.8rem' }}>{onlineApt.notes}</div>}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            className="btn-primary"
+                            style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', justifyContent: 'center' }}
+                            onClick={() => handleApproveOnlineBooking(onlineApt)}
+                          >
+                            <Check size={14} /> Aprovar Agendamento
+                          </button>
+                          <button
+                            className="btn-danger"
+                            style={{ padding: '7px 12px', fontSize: '0.82rem' }}
+                            onClick={() => handleRejectOnlineBooking(onlineApt.id)}
+                            title="Recusar agendamento falso ou trote"
+                          >
+                            <X size={14} /> Recusar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Grid of Appointments */}
             {filteredAppointments.length === 0 ? (
@@ -903,90 +1193,278 @@ export default function App() {
           </section>
         )}
 
-        {/* TAB 4: CLIENTES & FIDELIDADE */}
+        {/* TAB 4: CADASTRO DE CLIENTES & CRM INTELIGENTE */}
         {activeTab === 'clientes' && (
           <section className="fade-in">
             <div className="section-header">
               <div className="section-title-wrap">
-                <h2>Clientes & Histórico de Visitas</h2>
-                <p>Controle automático de visitas e atalho para reconexão no WhatsApp.</p>
+                <h2>Cadastro de Clientes & CRM</h2>
+                <p>Histórico completo, frequência de retorno e procedimentos favoritos de cada cliente.</p>
               </div>
 
-              <div style={{ position: 'relative', minWidth: '260px' }}>
-                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  placeholder="Buscar cliente..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="form-input"
-                  style={{ paddingLeft: '36px' }}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', minWidth: '220px' }}>
+                  <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome ou fone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '36px' }}
+                  />
+                </div>
+
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    setEditingClient(null);
+                    setIsClientModalOpen(true);
+                  }}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <UserPlus size={16} /> + Nova Cliente
+                </button>
               </div>
             </div>
 
-            {clientsList.length === 0 ? (
+            {/* CRM KPIs Grid */}
+            <div className="crm-kpi-grid">
+              <div className="crm-kpi-card">
+                <div className="crm-kpi-icon" style={{ background: 'var(--militar-50)', color: 'var(--militar-600)' }}>
+                  <Users size={20} />
+                </div>
+                <div className="crm-kpi-info">
+                  <span className="crm-kpi-label">Base de Clientes</span>
+                  <strong className="crm-kpi-value">{crmOverallStats.totalClients}</strong>
+                </div>
+              </div>
+
+              <div className="crm-kpi-card" style={{ borderColor: crmOverallStats.recallCount > 0 ? 'var(--gold-400)' : 'var(--border-subtle)' }}>
+                <div className="crm-kpi-icon" style={{ background: '#fdf5e6', color: '#b9770e' }}>
+                  <Clock size={20} />
+                </div>
+                <div className="crm-kpi-info">
+                  <span className="crm-kpi-label">Sugerir Retorno</span>
+                  <strong className="crm-kpi-value" style={{ color: '#b9770e' }}>{crmOverallStats.recallCount}</strong>
+                </div>
+              </div>
+
+              <div className="crm-kpi-card">
+                <div className="crm-kpi-icon" style={{ background: '#eaf5ee', color: '#1b7440' }}>
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="crm-kpi-info">
+                  <span className="crm-kpi-label">Clientes Em Dia</span>
+                  <strong className="crm-kpi-value" style={{ color: '#1b7440' }}>{crmOverallStats.onTimeCount}</strong>
+                </div>
+              </div>
+
+              <div className="crm-kpi-card">
+                <div className="crm-kpi-icon" style={{ background: 'var(--rose-50)', color: 'var(--gold-600)' }}>
+                  <DollarSign size={20} />
+                </div>
+                <div className="crm-kpi-info">
+                  <span className="crm-kpi-label">Ticket Médio</span>
+                  <strong className="crm-kpi-value">R$ {crmOverallStats.avgTicket.toFixed(2).replace('.', ',')}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Chips Bar */}
+            <div className="crm-filter-bar">
+              <button
+                className={`crm-filter-chip ${clientFilter === 'todos' ? 'active' : ''}`}
+                onClick={() => setClientFilter('todos')}
+              >
+                Todas ({consolidatedClients.length})
+              </button>
+              <button
+                className={`crm-filter-chip ${clientFilter === 'retorno' ? 'active' : ''}`}
+                onClick={() => setClientFilter('retorno')}
+              >
+                <Clock size={13} color="#b9770e" /> Sugerir Retorno ({crmOverallStats.recallCount})
+              </button>
+              <button
+                className={`crm-filter-chip ${clientFilter === 'em_dia' ? 'active' : ''}`}
+                onClick={() => setClientFilter('em_dia')}
+              >
+                <CheckCircle2 size={13} color="#1b7440" /> Em Dia ({crmOverallStats.onTimeCount})
+              </button>
+              <button
+                className={`crm-filter-chip ${clientFilter === 'ausentes' ? 'active' : ''}`}
+                onClick={() => setClientFilter('ausentes')}
+              >
+                <AlertCircle size={13} color="#c0392b" /> Ausentes (+60d) ({crmOverallStats.inactiveCount})
+              </button>
+              <button
+                className={`crm-filter-chip ${clientFilter === 'aniversariantes' ? 'active' : ''}`}
+                onClick={() => setClientFilter('aniversariantes')}
+              >
+                <Cake size={13} color="var(--gold-500)" /> Aniversariantes do Mês
+              </button>
+            </div>
+
+            {/* Grid de Clientes com CRM */}
+            {crmClientsList.length === 0 ? (
               <div className="empty-state">
                 <Users size={48} />
-                <h3>Nenhuma cliente registrada ainda</h3>
-                <p>Ao criar agendamentos, o Belíssima cadastra e contabiliza as clientes automaticamente!</p>
+                <h3>Nenhuma cliente encontrada</h3>
+                <p>Cadastre suas clientes ou utilize o botão abaixo para iniciar o CRM do Belíssima:</p>
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    setEditingClient(null);
+                    setIsClientModalOpen(true);
+                  }}
+                  style={{ marginTop: '0.75rem' }}
+                >
+                  <UserPlus size={16} /> + Cadastrar Primeira Cliente
+                </button>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-                {clientsList.map(c => {
-                  const sendClientReturnMsg = () => {
-                    const text = encodeURIComponent(
-                      `Olá, ${c.name}! 💕 Como estão seus cuidados? Passando para lembrar que estamos com horários abertos esta semana no *Belíssima*. Quer aproveitar para renovar seu visual? ✨`
-                    );
-                    const clean = c.phone.replace(/\D/g, '');
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '1rem' }}>
+                {crmClientsList.map(crmItem => {
+                  const { client, statusText, badgeClass, averageIntervalDays, daysSinceLastVisit, favoriteServices, totalVisits, totalSpent } = crmItem;
+
+                  const sendQuickWhatsApp = () => {
+                    const text = buildWhatsAppMessage(client, crmItem, 'retorno');
+                    const clean = (client.phone || '').replace(/\D/g, '');
                     const full = clean.startsWith('55') ? clean : `55${clean}`;
                     window.open(`https://api.whatsapp.com/send?phone=${full}&text=${text}`, '_blank');
                   };
 
                   return (
-                    <div
-                      key={c.phone}
-                      style={{
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border-subtle)',
-                        borderRadius: 'var(--radius-lg)',
-                        padding: '1.25rem',
-                        boxShadow: 'var(--shadow-sm)'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                        <div>
-                          <h3 style={{ fontSize: '1.1rem', fontWeight: '700' }}>{c.name}</h3>
-                          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{c.phone}</p>
+                    <div key={client.id || client.phone} className="client-card-hover">
+                      {/* Header do Card */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '50%',
+                              background: 'linear-gradient(135deg, var(--militar-500), var(--militar-700))',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: '700',
+                              fontSize: '1.1rem',
+                              border: '1.5px solid var(--gold-400)',
+                              flexShrink: 0
+                            }}
+                          >
+                            {client.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <h3 style={{ fontSize: '1.05rem', fontWeight: '700', margin: 0 }}>{client.name}</h3>
+                              {client.birthdate && (
+                                <span title={`Aniversário: ${client.birthdate.split('-').reverse().join('/')}`}>
+                                  <Cake size={13} color="var(--gold-500)" />
+                                </span>
+                              )}
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>{client.phone}</p>
+                          </div>
                         </div>
-                        <button
-                          className="btn-whatsapp"
-                          onClick={sendClientReturnMsg}
-                          title="Mandar mensagem de retorno"
-                        >
-                          <MessageCircle size={14} /> Chamar
-                        </button>
+
+                        <span className={`crm-badge ${badgeClass}`}>{statusText}</span>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '1rem', background: 'var(--rose-50)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-sm)', marginBottom: '0.85rem' }}>
-                        <div>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>VISITAS</span>
-                          <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)' }}>{c.totalVisits} vez(es)</strong>
+                      {/* Box de Tempo e Ciclo de Retorno do CRM */}
+                      <div className="crm-interval-box">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>🔄 Retorno habitual:</span>
+                          <strong style={{ color: 'var(--militar-700)' }}>
+                            {averageIntervalDays ? `A cada ${averageIntervalDays} dias` : totalVisits > 0 ? '1ª visita feita' : 'Sem histórico'}
+                          </strong>
                         </div>
-                        <div style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: '1rem' }}>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block' }}>TOTAL GASTO</span>
-                          <strong style={{ fontSize: '0.95rem', color: '#1b7440' }}>R$ {c.totalSpent.toFixed(2).replace('.', ',')}</strong>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.78rem' }}>
+                          <span style={{ color: 'var(--text-muted)' }}>⏳ Último procedimento:</span>
+                          <strong style={{ color: daysSinceLastVisit > 35 ? '#b9770e' : 'var(--text-primary)' }}>
+                            {daysSinceLastVisit !== null ? `Há ${daysSinceLastVisit} dias` : 'Nunca veio'}
+                          </strong>
                         </div>
                       </div>
 
+                      {/* Procedimentos que Mais Costuma Fazer */}
                       <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Serviços Realizados:</span>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
-                          {c.servicesDone.slice(0, 3).map((sn, idx) => (
-                            <span key={idx} style={{ fontSize: '0.72rem', background: 'var(--bg-card-hover)', border: '1px solid var(--border-subtle)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>
-                              {sn}
-                            </span>
-                          ))}
+                        <span style={{ fontSize: '0.72rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                          Procedimentos que Costuma Fazer:
+                        </span>
+                        {favoriteServices.length === 0 ? (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            Ainda não realizou procedimentos
+                          </span>
+                        ) : (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {favoriteServices.slice(0, 3).map((fav) => (
+                              <span key={fav.name} className="crm-service-tag">
+                                {fav.name} <span className="count-pill">{fav.count}×</span>
+                              </span>
+                            ))}
+                            {favoriteServices.length > 3 && (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', alignSelf: 'center' }}>
+                                +{favoriteServices.length - 3} mais
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Resumo Financeiro & Visitas */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.65rem', fontSize: '0.8rem' }}>
+                        <span style={{ color: 'var(--text-muted)' }}>
+                          <strong>{totalVisits}</strong> visita{totalVisits !== 1 ? 's' : ''}
+                        </span>
+                        <strong style={{ color: '#1b7440', fontSize: '0.88rem' }}>
+                          R$ {totalSpent.toFixed(2).replace('.', ',')}
+                        </strong>
+                      </div>
+
+                      {/* Barra de Ações Rápidas */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.65rem' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            className="btn-whatsapp"
+                            onClick={sendQuickWhatsApp}
+                            title="Chamar cliente no WhatsApp com lembrete inteligente"
+                            style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                          >
+                            <MessageCircle size={14} /> Chamar
+                          </button>
+                          <button
+                            className="btn-secondary"
+                            onClick={() => handleOpenClientDetails(crmItem)}
+                            title="Ver histórico e ficha completa de CRM"
+                            style={{ fontSize: '0.78rem', padding: '0.4rem 0.75rem' }}
+                          >
+                            <History size={14} /> Ficha CRM
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          <button
+                            className="btn-secondary"
+                            onClick={() => handleScheduleForClient(client)}
+                            title="Agendar novo horário para esta cliente"
+                            style={{ fontSize: '0.78rem', padding: '0.4rem 0.65rem', background: 'var(--rose-50)', borderColor: 'var(--gold-400)', color: 'var(--militar-700)' }}
+                          >
+                            <Calendar size={13} /> Agendar
+                          </button>
+                          <button
+                            className="btn-icon"
+                            onClick={() => {
+                              setEditingClient(client);
+                              setIsClientModalOpen(true);
+                            }}
+                            title="Editar Dados Cadastrais"
+                            style={{ width: '32px', height: '32px' }}
+                          >
+                            <Edit3 size={14} />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1077,14 +1555,24 @@ export default function App() {
                         className="btn-secondary"
                         style={{ minHeight: '34px', fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
                         onClick={() => {
-                          setCurrentUser(user);
-                          showToast(`Sessão alternada para ${user.name}!`);
+                          if (isCurrentActive) return;
+                          setSwitchTargetUser(user);
+                          setIsSwitchUserModalOpen(true);
                         }}
                       >
                         {isCurrentActive ? 'Usuário Atual' : 'Usar Esta Conta'}
                       </button>
 
                       <div style={{ display: 'flex', gap: '0.35rem' }}>
+                        <button
+                          className="btn-icon"
+                          style={{ width: '34px', height: '34px', color: 'var(--gold-accent)' }}
+                          onClick={() => setResetPasswordUser(user)}
+                          title="Resetar Senha deste Usuário"
+                        >
+                          <Key size={14} />
+                        </button>
+
                         <button
                           className="btn-icon"
                           style={{ width: '34px', height: '34px' }}
@@ -1290,17 +1778,39 @@ export default function App() {
           initialData={editingAppointment}
           services={services}
           staff={users}
+          clients={consolidatedClients}
           defaultDate={selectedDate}
-          onClose={() => setIsAppointmentModalOpen(false)}
+          onClose={() => {
+            setIsAppointmentModalOpen(false);
+            setEditingAppointment(null);
+          }}
           onSave={(newApt) => {
-            if (editingAppointment) {
+            if (editingAppointment?.id) {
               setAppointments(prev => prev.map(a => (a.id === newApt.id ? newApt : a)));
               showToast('Agendamento atualizado com sucesso!');
             } else {
               setAppointments(prev => [...prev, newApt]);
+              // Auto-register client if not exists
+              const cleanPhone = (newApt.clientPhone || '').replace(/\D/g, '');
+              const exists = clients.some(c => (c.phone && c.phone.replace(/\D/g, '') === cleanPhone) || c.name.toLowerCase() === newApt.clientName.toLowerCase());
+              if (!exists) {
+                const newClient = {
+                  id: `cli-${Date.now()}`,
+                  name: newApt.clientName,
+                  phone: newApt.clientPhone,
+                  birthdate: '',
+                  email: '',
+                  hairProfile: '',
+                  beautyProfile: '',
+                  notes: newApt.notes || '',
+                  createdAt: newApt.date
+                };
+                setClients(prev => [newClient, ...prev]);
+              }
               showToast('Novo agendamento criado!');
             }
             setIsAppointmentModalOpen(false);
+            setEditingAppointment(null);
           }}
         />
       )}
@@ -1387,57 +1897,184 @@ export default function App() {
           <div className="modal-content" style={{ maxWidth: '420px' }}>
             <div className="sheet-handle"></div>
             <div className="modal-header">
-              <h3>Alternar Usuário / Operador</h3>
-              <button onClick={() => setIsSwitchUserModalOpen(false)} className="btn-icon" style={{ width: '34px', height: '34px' }}><X size={18} /></button>
+              <h3>{switchTargetUser ? `Autenticar ${switchTargetUser.name}` : 'Alternar Usuário / Operador'}</h3>
+              <button
+                onClick={() => {
+                  setIsSwitchUserModalOpen(false);
+                  setSwitchTargetUser(null);
+                  setSwitchPasswordInput('');
+                  setSwitchPasswordError('');
+                }}
+                className="btn-icon"
+                style={{ width: '34px', height: '34px' }}
+              >
+                <X size={18} />
+              </button>
             </div>
             <div className="modal-body">
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Selecione quem está operando o sistema agora no <strong>Belíssima</strong>:
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                {users.map(u => {
-                  const isCurrent = currentUser?.id === u.id;
-                  return (
-                    <div
-                      key={u.id}
-                      onClick={() => {
-                        setCurrentUser(u);
-                        setIsSwitchUserModalOpen(false);
-                        showToast(`Sessão agora ativa com ${u.name}!`);
+              {switchTargetUser ? (
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const userPass = switchTargetUser.password || '123456';
+                  if (switchPasswordInput === userPass) {
+                    setCurrentUser(switchTargetUser);
+                    setIsSwitchUserModalOpen(false);
+                    setSwitchTargetUser(null);
+                    setSwitchPasswordInput('');
+                    setSwitchPasswordError('');
+                    showToast(`Sessão autenticada para ${switchTargetUser.name}!`);
+                  } else {
+                    setSwitchPasswordError('Senha incorreta. Tente novamente ou use a opção de Resetar Senha.');
+                  }
+                }}>
+                  <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                    <div className="user-avatar-lg" style={{ margin: '0 auto 8px auto' }}>
+                      {switchTargetUser.name.charAt(0).toUpperCase()}
+                    </div>
+                    <strong style={{ fontSize: '1.05rem', display: 'block' }}>{switchTargetUser.name}</strong>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Informe a senha para assumir o controle da sessão
+                    </span>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Senha de Acesso</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      placeholder="Digite a senha..."
+                      value={switchPasswordInput}
+                      onChange={(e) => {
+                        setSwitchPasswordInput(e.target.value);
+                        setSwitchPasswordError('');
                       }}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '0.75rem 1rem',
-                        borderRadius: 'var(--radius-md)',
-                        background: isCurrent ? 'var(--rose-50)' : 'var(--bg-app)',
-                        border: isCurrent ? '1.5px solid var(--rose-400)' : '1px solid var(--border-subtle)',
-                        cursor: 'pointer'
+                      autoFocus
+                      required
+                    />
+                    {switchPasswordError && (
+                      <p style={{ color: '#dc2626', fontSize: '0.82rem', marginTop: '6px' }}>
+                        {switchPasswordError}
+                      </p>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        setSwitchTargetUser(null);
+                        setSwitchPasswordInput('');
+                        setSwitchPasswordError('');
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div className="user-avatar-sm" style={{ width: '32px', height: '32px', fontSize: '0.9rem' }}>
-                          {u.name.charAt(0).toUpperCase()}
+                      Voltar
+                    </button>
+                    <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                      Entrar
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Selecione quem está operando o sistema agora no <strong>Belíssima</strong>:
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    {users.map(u => {
+                      const isCurrent = currentUser?.id === u.id;
+                      return (
+                        <div
+                          key={u.id}
+                          onClick={() => {
+                            if (isCurrent) {
+                              setIsSwitchUserModalOpen(false);
+                              return;
+                            }
+                            setSwitchTargetUser(u);
+                            setSwitchPasswordInput('');
+                            setSwitchPasswordError('');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '0.75rem 1rem',
+                            borderRadius: 'var(--radius-md)',
+                            background: isCurrent ? 'var(--rose-50)' : 'var(--bg-app)',
+                            border: isCurrent ? '1.5px solid var(--rose-400)' : '1px solid var(--border-subtle)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div className="user-avatar-sm" style={{ width: '32px', height: '32px', fontSize: '0.9rem' }}>
+                              {u.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <strong style={{ fontSize: '0.9rem', display: 'block' }}>{u.name}</strong>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--rose-500)', textTransform: 'uppercase' }}>
+                                {u.role === 'admin' ? '👑 Administradora' : u.role === 'recepcao' ? '💼 Recepção' : '✂️ Profissional'}
+                              </span>
+                            </div>
+                          </div>
+                          {isCurrent ? <Check size={18} color="var(--rose-500)" /> : <Lock size={15} color="var(--text-muted)" />}
                         </div>
-                        <div>
-                          <strong style={{ fontSize: '0.9rem', display: 'block' }}>{u.name}</strong>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--rose-500)', textTransform: 'uppercase' }}>
-                            {u.role === 'admin' ? '👑 Administradora' : u.role === 'recepcao' ? '💼 Recepção' : '✂️ Profissional'}
-                          </span>
-                        </div>
-                      </div>
-                      {isCurrent && <Check size={18} color="var(--rose-500)" />}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setIsSwitchUserModalOpen(false)}>Fechar</button>
+                      );
+                    })}
+                  </div>
+                  <div className="modal-footer" style={{ marginTop: '16px', padding: 0 }}>
+                    <button className="btn-secondary" style={{ width: '100%' }} onClick={() => setIsSwitchUserModalOpen(false)}>Fechar</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {/* =========================================================================
+          MODAIS DO CRM: CADASTRAR/EDITAR CLIENTE E FICHA DETALHADA
+          ========================================================================= */}
+      {isClientModalOpen && (
+        <ClientModal
+          initialData={editingClient}
+          onClose={() => {
+            setIsClientModalOpen(false);
+            setEditingClient(null);
+          }}
+          onSave={handleSaveClient}
+        />
+      )}
+
+      {isClientDetailsOpen && selectedClientCRM && (
+        <ClientDetailsModal
+          crmData={selectedClientCRM}
+          services={services}
+          staff={users}
+          onClose={() => {
+            setIsClientDetailsOpen(false);
+            setSelectedClientCRM(null);
+          }}
+          onEdit={(cli) => {
+            setIsClientDetailsOpen(false);
+            setEditingClient(cli);
+            setIsClientModalOpen(true);
+          }}
+          onDelete={handleDeleteClient}
+          onNewAppointment={handleScheduleForClient}
+        />
+      )}
+
+      {/* =========================================================================
+          MODAL: RESET DE SENHA DE USUÁRIO
+          ========================================================================= */}
+      {resetPasswordUser && (
+        <ResetPasswordModal
+          user={resetPasswordUser}
+          onClose={() => setResetPasswordUser(null)}
+          onSavePassword={handleSaveResetPassword}
+        />
       )}
     </div>
   );
@@ -1446,7 +2083,7 @@ export default function App() {
 // =============================================================================
 // SUBCOMPONENT: APPOINTMENT MODAL
 // =============================================================================
-function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, onClose, onSave }) {
+function AppointmentModal({ isOpen, initialData, services, staff, clients = [], defaultDate, onClose, onSave }) {
   const [clientName, setClientName] = useState(initialData?.clientName || '');
   const [clientPhone, setClientPhone] = useState(initialData?.clientPhone || '');
   const [date, setDate] = useState(initialData?.date || defaultDate);
@@ -1455,6 +2092,14 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
   const [serviceIds, setServiceIds] = useState(initialData?.serviceIds || []);
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [activeCategory, setActiveCategory] = useState('cabelo');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedClientProfile, setSelectedClientProfile] = useState(() => {
+    if (initialData?.clientPhone) {
+      const clean = initialData.clientPhone.replace(/\D/g, '');
+      return clients.find(c => (c.phone || '').replace(/\D/g, '') === clean);
+    }
+    return null;
+  });
 
   const toggleService = (id) => {
     setServiceIds(prev =>
@@ -1519,17 +2164,74 @@ function AppointmentModal({ isOpen, initialData, services, staff, defaultDate, o
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
           <div className="modal-body">
-            <div className="form-group">
+            <div className="form-group" style={{ position: 'relative' }}>
               <label>Nome Completo da Cliente *</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="Ex: Ana Clara Martins"
+                placeholder="Ex: Ana Clara Martins (ou busque cliente cadastrada)"
                 value={clientName}
-                onChange={e => setClientName(e.target.value)}
+                onChange={e => {
+                  setClientName(e.target.value);
+                  setShowDropdown(true);
+                  if (selectedClientProfile && e.target.value !== selectedClientProfile.name) {
+                    setSelectedClientProfile(null);
+                  }
+                }}
+                onFocus={() => setShowDropdown(true)}
                 required
               />
+
+              {/* Autocomplete de Clientes Cadastradas */}
+              {showDropdown && clientName.trim().length > 0 && clients.length > 0 && (
+                <div className="autocomplete-dropdown">
+                  {clients
+                    .filter(c => c.name.toLowerCase().includes(clientName.toLowerCase()))
+                    .slice(0, 5)
+                    .map(c => (
+                      <div
+                        key={c.id || c.phone}
+                        className="autocomplete-item"
+                        onClick={() => {
+                          setClientName(c.name);
+                          setClientPhone(c.phone);
+                          setSelectedClientProfile(c);
+                          setShowDropdown(false);
+                        }}
+                      >
+                        <div>
+                          <strong style={{ fontSize: '0.85rem' }}>{c.name}</strong>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>{c.phone}</span>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--gold-600)', fontWeight: '700' }}>Selecionar</span>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
+
+            {selectedClientProfile && (
+              <div style={{ background: 'var(--rose-50)', padding: '0.6rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', marginBottom: '0.85rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: '700', color: 'var(--militar-700)' }}>
+                    ✨ Cliente Belíssima Selecionada
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedClientProfile(null)}
+                    style={{ fontSize: '0.7rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >
+                    Desvincular
+                  </button>
+                </div>
+                {(selectedClientProfile.hairProfile || selectedClientProfile.notes) && (
+                  <p style={{ margin: '3px 0 0 0', fontSize: '0.75rem', color: 'var(--text-primary)' }}>
+                    {selectedClientProfile.hairProfile ? `Cabelo: ${selectedClientProfile.hairProfile} • ` : ''}
+                    {selectedClientProfile.notes ? `Obs: ${selectedClientProfile.notes}` : ''}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="form-row">
               <div className="form-group">
@@ -1885,6 +2587,8 @@ function UserModal({ initialData, onClose, onSave }) {
   const [name, setName] = useState(initialData?.name || '');
   const [email, setEmail] = useState(initialData?.email || '');
   const [phone, setPhone] = useState(initialData?.phone || '');
+  const [password, setPassword] = useState(initialData?.password || '');
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState(initialData?.role || 'profissional');
   const [commission, setCommission] = useState(initialData?.commission ?? 50);
   const [specialties, setSpecialties] = useState(initialData?.specialties || ['cabelo']);
@@ -1907,6 +2611,7 @@ function UserModal({ initialData, onClose, onSave }) {
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
+      password: password.trim() || initialData?.password || '123456',
       role,
       commission: Number(commission),
       specialties,
@@ -1979,6 +2684,40 @@ function UserModal({ initialData, onClose, onSave }) {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                 />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>
+                Senha de Acesso {initialData ? '(deixe em branco para manter a atual)' : '*'}
+              </label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="form-input"
+                  placeholder={initialData ? '••••••••' : 'Defina uma senha para o usuário'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required={!initialData}
+                  style={{ paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)'
+                  }}
+                  title={showPassword ? 'Ocultar senha' : 'Ver senha'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 
